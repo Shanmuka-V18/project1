@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
+import { validateCustomCategory, getPredefinedCategories, BudgetType } from '@/lib/budget-utils';
 
 const budgetSchema = z.object({
+  budgetType: z.enum(['personal', 'business']).default('business'),
   category: z.string().min(1, 'Category is required'),
   monthlyLimit: z.number().positive('Monthly limit must be positive'),
   month: z.number().min(1).max(12).optional(),
@@ -20,9 +22,35 @@ export async function GET(request: Request) {
   const now = new Date();
   const month = parseInt(searchParams.get('month') || `${now.getMonth() + 1}`, 10);
   const year = parseInt(searchParams.get('year') || `${now.getFullYear()}`, 10);
+  const budgetTypeParam = searchParams.get('budgetType');
+
+  const where: any = { userId: currentUser.userId, month, year };
+  if (budgetTypeParam && (budgetTypeParam === 'personal' || budgetTypeParam === 'business')) {
+    where.budgetType = budgetTypeParam;
+  }
 
   const budgets = await prisma.budget.findMany({
-    where: { userId: currentUser.userId, month, year },
+    where,
+    orderBy: { createdAt: 'desc' },
+  });
+
+  // Collect all distinct custom category names created by this user
+  const allUserBudgets = await prisma.budget.findMany({
+    where: { userId: currentUser.userId },
+    select: { category: true, budgetType: true },
+  });
+
+  const customCategoriesMap: Record<BudgetType, string[]> = {
+    personal: [],
+    business: [],
+  };
+
+  allUserBudgets.forEach((b) => {
+    const type: BudgetType = (b.budgetType as BudgetType) || 'business';
+    const predefined = getPredefinedCategories(type);
+    if (!predefined.includes(b.category as any) && !customCategoriesMap[type].includes(b.category)) {
+      customCategoriesMap[type].push(b.category);
+    }
   });
 
   const monthStart = new Date(year, month - 1, 1);
@@ -49,6 +77,7 @@ export async function GET(request: Request) {
 
     return {
       ...b,
+      budgetType: b.budgetType || 'business',
       actualSpent,
       remaining: b.monthlyLimit - actualSpent,
       percentage,
@@ -56,7 +85,12 @@ export async function GET(request: Request) {
     };
   });
 
-  return NextResponse.json({ budgets: budgetProgress, month, year });
+  return NextResponse.json({
+    budgets: budgetProgress,
+    customCategories: customCategoriesMap,
+    month,
+    year,
+  });
 }
 
 export async function POST(request: Request) {
@@ -73,6 +107,16 @@ export async function POST(request: Request) {
     const month = validated.month || now.getMonth() + 1;
     const year = validated.year || now.getFullYear();
 
+    // Check for duplicate categories within same budget type for user in month/year
+    const existingSameMonthCategory = await prisma.budget.findFirst({
+      where: {
+        userId: currentUser.userId,
+        category: validated.category,
+        month,
+        year,
+      },
+    });
+
     const budget = await prisma.budget.upsert({
       where: {
         userId_category_month_year: {
@@ -84,9 +128,11 @@ export async function POST(request: Request) {
       },
       update: {
         monthlyLimit: validated.monthlyLimit,
+        budgetType: validated.budgetType,
       },
       create: {
         userId: currentUser.userId,
+        budgetType: validated.budgetType,
         category: validated.category,
         monthlyLimit: validated.monthlyLimit,
         month,

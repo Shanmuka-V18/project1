@@ -63,6 +63,7 @@ model Expense {
 model Budget {
   id           String   @id @default(uuid())
   userId       String
+  budgetType   String   @default("business") // personal | business
   category     String
   monthlyLimit Float
   month        Int      // 1 - 12
