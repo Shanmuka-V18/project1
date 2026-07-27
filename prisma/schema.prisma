@@ -1,0 +1,145 @@
+// Prisma Schema for AI-Powered Financial & CA Assistant
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String            @id @default(uuid())
+  username          String            @unique
+  email             String            @unique
+  passwordHash      String
+  profilePictureUrl String?
+  createdAt         DateTime          @default(now())
+
+  incomes           Income[]
+  expenses          Expense[]
+  budgets           Budget[]
+  invoices          Invoice[]
+  gstHistories      GSTHistory[]
+  financialHealths  FinancialHealth[]
+  notifications     Notification[]
+  aiConversations   AIConversation[]
+}
+
+model Income {
+  id            String   @id @default(uuid())
+  userId        String
+  amount        Float
+  source        String
+  category      String
+  date          DateTime
+  paymentMethod String   // Cash, UPI, Bank, Card
+  notes         String?
+  receiptUrl    String?
+  isRecurring   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Expense {
+  id            String   @id @default(uuid())
+  userId        String
+  amount        Float
+  category      String   // Rent, Utilities, Salaries, Travel, Marketing, Software, Taxes, Loan Repayment, Misc, etc.
+  subcategory   String?
+  vendor        String?
+  date          DateTime
+  paymentMethod String   // Cash, UPI, Bank, Card
+  notes         String?
+  receiptUrl    String?
+  isRecurring   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Budget {
+  id           String   @id @default(uuid())
+  userId       String
+  category     String
+  monthlyLimit Float
+  month        Int      // 1 - 12
+  year         Int
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category, month, year])
+}
+
+model Invoice {
+  id           String   @id @default(uuid())
+  userId       String
+  invoiceNumber String  // e.g. INV-2026-0001
+  businessName String
+  pan          String?
+  gstin        String?
+  clientName   String
+  clientEmail  String
+  items        String   // JSON stringified list of items
+  subtotal     Float
+  gstAmount    Float
+  discount     Float    @default(0)
+  total        Float
+  status       String   // Draft, Sent, Paid, Overdue
+  dueDate      DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GSTHistory {
+  id              String   @id @default(uuid())
+  userId          String
+  amount          Float
+  gstRate         Float    // 0, 5, 12, 18, 28
+  transactionType String   // Intra-State, Inter-State
+  cgst            Float
+  sgst            Float
+  igst            Float
+  finalAmount     Float
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FinancialHealth {
+  id        String   @id @default(uuid())
+  userId    String
+  score     Float    // 0 - 100
+  breakdown String   // JSON stringified breakdown factors
+  month     Int
+  year      Int
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, month, year])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // Budget Exceeded, Low Balance, Monthly Report, Budget Reminder, Invoice Due
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AIConversation {
+  id        String   @id @default(uuid())
+  userId    String
+  messages  String   // JSON stringified conversation messages
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
