@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
+import { validatePhoneNumber, INVOICE_STATUSES, PAYMENT_MODES } from '@/lib/invoice-utils';
 
 const invoiceItemSchema = z.object({
   description: z.string().min(1, 'Description required'),
@@ -15,11 +16,14 @@ const invoiceSchema = z.object({
   gstin: z.string().optional(),
   clientName: z.string().min(1, 'Client name is required'),
   clientEmail: z.string().email('Valid client email is required'),
+  clientPhone: z.string().optional().nullable(),
+  paymentMode: z.enum(PAYMENT_MODES).default('Bank Transfer'),
   items: z.array(invoiceItemSchema).min(1, 'At least one item is required'),
   gstRate: z.number().nonnegative().default(18),
   discount: z.number().nonnegative().default(0),
+  amountPaid: z.number().nonnegative().default(0),
   dueDate: z.string().or(z.date()),
-  status: z.enum(['Draft', 'Sent', 'Paid', 'Overdue']).default('Draft'),
+  status: z.enum(INVOICE_STATUSES).default('Draft'),
 });
 
 export async function GET(request: Request) {
@@ -30,9 +34,11 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const status = searchParams.get('status');
+  const paymentMode = searchParams.get('paymentMode');
 
   const where: any = { userId: currentUser.userId };
   if (status && status !== 'All') where.status = status;
+  if (paymentMode && paymentMode !== 'All') where.paymentMode = paymentMode;
 
   const invoices = await prisma.invoice.findMany({
     where,
@@ -52,6 +58,13 @@ export async function POST(request: Request) {
     const body = await request.json();
     const validated = invoiceSchema.parse(body);
 
+    if (validated.clientPhone) {
+      const phoneVal = validatePhoneNumber(validated.clientPhone);
+      if (!phoneVal.isValid) {
+        return NextResponse.json({ error: phoneVal.error }, { status: 400 });
+      }
+    }
+
     const year = new Date().getFullYear();
     const count = await prisma.invoice.count({
       where: { userId: currentUser.userId },
@@ -68,6 +81,14 @@ export async function POST(request: Request) {
     const gstAmount = (subtotal * validated.gstRate) / 100;
     const total = Math.max(0, subtotal + gstAmount - validated.discount);
 
+    // Auto align status if amountPaid matches criteria
+    let finalStatus = validated.status;
+    if (validated.amountPaid >= total && total > 0) {
+      finalStatus = 'Paid';
+    } else if (validated.amountPaid > 0 && validated.amountPaid < total) {
+      finalStatus = 'Partially Paid';
+    }
+
     const invoice = await prisma.invoice.create({
       data: {
         userId: currentUser.userId,
@@ -77,12 +98,15 @@ export async function POST(request: Request) {
         gstin: validated.gstin || null,
         clientName: validated.clientName,
         clientEmail: validated.clientEmail,
+        clientPhone: validated.clientPhone || null,
+        paymentMode: validated.paymentMode,
         items: JSON.stringify(itemsWithAmounts),
         subtotal,
         gstAmount,
         discount: validated.discount,
         total,
-        status: validated.status,
+        amountPaid: validated.amountPaid,
+        status: finalStatus,
         dueDate: new Date(validated.dueDate),
       },
     });

@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { calculateBalanceDue } from '@/lib/invoice-utils';
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   const currentUser = await getCurrentUser();
@@ -61,14 +62,20 @@ export async function GET(request: Request, { params }: { params: { id: string }
   page.drawText(`Due Date: ${formatDate(invoice.dueDate)}`, { x: 450, y, size: 10, font, color: grayColor });
   y -= 15;
   page.drawText(`Status: ${invoice.status.toUpperCase()}`, { x: 450, y, size: 10, font: fontBold, color: primaryColor });
+  y -= 15;
+  page.drawText(`Payment Mode: ${invoice.paymentMode || 'Bank Transfer'}`, { x: 450, y, size: 10, font, color: darkColor });
 
-  y -= 30;
+  y -= 20;
   // Billed To Box
   page.drawText('BILLED TO:', { x: 40, y, size: 11, font: fontBold, color: darkColor });
   y -= 15;
   page.drawText(invoice.clientName, { x: 40, y, size: 12, font: fontBold, color: primaryColor });
   y -= 15;
-  page.drawText(invoice.clientEmail, { x: 40, y, size: 10, font, color: grayColor });
+  page.drawText(`Email: ${invoice.clientEmail}`, { x: 40, y, size: 10, font, color: grayColor });
+  if (invoice.clientPhone) {
+    y -= 15;
+    page.drawText(`Phone: ${invoice.clientPhone}`, { x: 40, y, size: 10, font, color: grayColor });
+  }
 
   y -= 35;
   // Line Items Table Header
@@ -113,17 +120,29 @@ export async function GET(request: Request, { params }: { params: { id: string }
     page.drawText(`-${formatCurrency(invoice.discount)}`, { x: 480, y, size: 10, font, color: darkColor });
   }
 
+  y -= 18;
+  page.drawText('Total Amount:', { x: 380, y, size: 10, font: fontBold, color: darkColor });
+  page.drawText(formatCurrency(invoice.total), { x: 480, y, size: 10, font: fontBold, color: darkColor });
+
+  if ((invoice.amountPaid || 0) > 0) {
+    y -= 18;
+    page.drawText('Amount Paid:', { x: 380, y, size: 10, font, color: rgb(0.06, 0.6, 0.3) });
+    page.drawText(formatCurrency(invoice.amountPaid), { x: 480, y, size: 10, font: fontBold, color: rgb(0.06, 0.6, 0.3) });
+  }
+
+  const balanceDue = calculateBalanceDue(invoice.total, invoice.amountPaid || 0);
+
   y -= 25;
   page.drawRectangle({
     x: 360,
     y: y - 5,
     width: 200,
     height: 30,
-    color: rgb(0.9, 0.97, 0.96),
+    color: balanceDue === 0 ? rgb(0.9, 0.97, 0.96) : rgb(0.99, 0.95, 0.9),
   });
 
-  page.drawText('TOTAL AMOUNT:', { x: 370, y: y + 5, size: 11, font: fontBold, color: primaryColor });
-  page.drawText(formatCurrency(invoice.total), { x: 480, y: y + 5, size: 12, font: fontBold, color: primaryColor });
+  page.drawText('BALANCE DUE:', { x: 370, y: y + 5, size: 11, font: fontBold, color: primaryColor });
+  page.drawText(formatCurrency(balanceDue), { x: 480, y: y + 5, size: 12, font: fontBold, color: primaryColor });
 
   y -= 60;
   page.drawText('Thank you for your business!', { x: 220, y, size: 10, font, color: grayColor });

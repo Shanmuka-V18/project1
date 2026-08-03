@@ -84,12 +84,15 @@ model Invoice {
   gstin        String?
   clientName   String
   clientEmail  String
+  clientPhone  String?
+  paymentMode  String   @default("Bank Transfer") // Cash, UPI, Bank Transfer, Credit Card, Cheque
   items        String   // JSON stringified list of items
   subtotal     Float
   gstAmount    Float
   discount     Float    @default(0)
   total        Float
-  status       String   // Draft, Sent, Paid, Overdue
+  amountPaid   Float    @default(0)
+  status       String   // Draft, Sent, Partially Paid, Paid, Overdue, Cancelled
   dueDate      DateTime
   createdAt    DateTime @default(now())
 
