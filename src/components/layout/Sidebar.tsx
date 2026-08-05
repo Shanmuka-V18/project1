@@ -48,26 +48,26 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'relative flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md transition-all duration-300 z-30',
+        'relative flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md transition-all duration-300 z-30',
         isSidebarOpen ? 'w-64' : 'w-20'
       )}
     >
       {/* Brand Header */}
       <div className="flex h-16 items-center justify-between px-4 border-b border-slate-200 dark:border-slate-800">
         <Link href="/dashboard" className="flex items-center space-x-3 overflow-hidden">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-teal-700 text-white shadow-lg glow-teal">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-teal-600 to-teal-700 text-white shadow-lg glow-teal">
             <Sparkles className="h-5 w-5" />
           </div>
           {isSidebarOpen && (
             <div className="flex flex-col">
-              <span className="font-bold text-slate-900 dark:text-slate-100 text-sm tracking-wide">FINANCIAL AI</span>
-              <span className="text-[10px] font-medium text-teal-600 dark:text-teal-400">CA ASSISTANT</span>
+              <span className="font-extrabold text-slate-900 dark:text-slate-100 text-sm tracking-wide">FINANCIAL AI</span>
+              <span className="text-[10px] font-bold text-teal-700 dark:text-teal-400">CA ASSISTANT</span>
             </div>
           )}
         </Link>
         <button
           onClick={toggleSidebar}
-          className="rounded-lg p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+          className="rounded-lg p-1.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
         >
           {isSidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
         </button>
@@ -84,22 +84,22 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                'group flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
+                'group flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-150',
                 isActive
-                  ? 'bg-teal-50 dark:bg-teal-600/20 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-500/30 font-semibold'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-200'
+                  ? 'bg-teal-50 dark:bg-teal-600/20 text-teal-800 dark:text-teal-300 border border-teal-300 dark:border-teal-500/30'
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100'
               )}
             >
               <Icon
                 className={cn(
                   'h-5 w-5 shrink-0 transition-colors',
-                  isActive ? 'text-teal-600 dark:text-teal-400' : 'text-slate-400 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200',
+                  isActive ? 'text-teal-700 dark:text-teal-400' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-100',
                   !isSidebarOpen && 'mx-auto'
                 )}
               />
               {isSidebarOpen && <span className="ml-3 truncate">{item.label}</span>}
               {isSidebarOpen && item.badge && (
-                <span className="ml-auto rounded-full bg-teal-100 dark:bg-teal-500/20 px-2 py-0.5 text-[10px] font-bold text-teal-700 dark:text-teal-300 border border-teal-300 dark:border-teal-500/40">
+                <span className="ml-auto rounded-full bg-teal-100 dark:bg-teal-500/20 px-2 py-0.5 text-[10px] font-bold text-teal-800 dark:text-teal-300 border border-teal-300 dark:border-teal-500/40">
                   {item.badge}
                 </span>
               )}
@@ -116,13 +116,13 @@ export function Sidebar() {
       {/* Footer Profile Snippet */}
       {isSidebarOpen && (
         <div className="p-4 border-t border-slate-200 dark:border-slate-800/80">
-          <div className="flex items-center space-x-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 p-2.5 border border-slate-200 dark:border-slate-800">
+          <div className="flex items-center space-x-3 rounded-xl bg-slate-100 dark:bg-slate-800/50 p-2.5 border border-slate-200 dark:border-slate-800">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-600 text-white font-bold text-xs">
               FA
             </div>
             <div className="flex flex-col truncate">
-              <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">Demo User</span>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate">demo@financialassistant.ai</span>
+              <span className="text-xs font-bold text-slate-900 dark:text-slate-100">Demo User</span>
+              <span className="text-[10px] text-slate-600 dark:text-slate-400 truncate">demo@financialassistant.ai</span>
             </div>
           </div>
         </div>

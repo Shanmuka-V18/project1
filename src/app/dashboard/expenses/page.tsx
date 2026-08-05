@@ -1,67 +1,43 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Trash2, Edit2, Upload, FileSpreadsheet, RefreshCw } from 'lucide-react';
-import { Card } from '@/components/ui/Card';
+import { Plus, Trash2, TrendingDown, Upload, AlertCircle, FileSpreadsheet } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
+import { PageTitle, MutedText, FormLabel, TableHeading, StatLabel } from '@/components/ui/Typography';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import Papa from 'papaparse';
-
-const CATEGORIES = [
-  'Rent',
-  'Utilities',
-  'Salaries',
-  'Travel',
-  'Marketing',
-  'Software',
-  'Taxes',
-  'Loan Repayment',
-  'Misc',
-];
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('All');
-  const [paymentFilter, setPaymentFilter] = useState('All');
-
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
-  // Form fields
+  // Form states
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('Rent');
-  const [customCategory, setCustomCategory] = useState('');
-  const [subcategory, setSubcategory] = useState('');
   const [vendor, setVendor] = useState('');
+  const [category, setCategory] = useState('Office Supplies');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'UPI' | 'Bank' | 'Card'>('Bank');
+  const [paymentMethod, setPaymentMethod] = useState('UPI');
   const [notes, setNotes] = useState('');
   const [isRecurring, setIsRecurring] = useState(false);
+  const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // CSV Import State
-  const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [csvPreview, setCsvPreview] = useState<any[]>([]);
-  const [isImporting, setIsImporting] = useState(false);
+  // CSV Import state
+  const [csvContent, setCsvContent] = useState('');
+  const [importStatus, setImportStatus] = useState('');
 
   useEffect(() => {
     fetchExpenses();
-  }, [categoryFilter, paymentFilter, search]);
+  }, []);
 
   const fetchExpenses = async () => {
     setIsLoading(true);
-    const params = new URLSearchParams();
-    if (categoryFilter !== 'All') params.append('category', categoryFilter);
-    if (paymentFilter !== 'All') params.append('paymentMethod', paymentFilter);
-    if (search) params.append('search', search);
-
     try {
-      const res = await fetch(`/api/expenses?${params.toString()}`);
+      const res = await fetch('/api/expenses');
       const data = await res.json();
       if (data.expenses) setExpenses(data.expenses);
     } catch (e) {
@@ -71,68 +47,70 @@ export default function ExpensesPage() {
     }
   };
 
-  const openCreateModal = () => {
-    setEditingId(null);
-    setAmount('');
-    setCategory('Rent');
-    setCustomCategory('');
-    setSubcategory('');
-    setVendor('');
-    setDate(new Date().toISOString().split('T')[0]);
-    setPaymentMethod('Bank');
-    setNotes('');
-    setIsRecurring(false);
-    setIsModalOpen(true);
-  };
-
-  const openEditModal = (exp: any) => {
-    setEditingId(exp.id);
-    setAmount(String(exp.amount));
-    setCategory(exp.category);
-    setSubcategory(exp.subcategory || '');
-    setVendor(exp.vendor || '');
-    setDate(new Date(exp.date).toISOString().split('T')[0]);
-    setPaymentMethod(exp.paymentMethod);
-    setNotes(exp.notes || '');
-    setIsRecurring(exp.isRecurring);
-    setIsModalOpen(true);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError('');
     setIsSubmitting(true);
 
-    const finalCategory = category === 'Custom' ? customCategory : category;
-
-    const payload = {
-      amount: parseFloat(amount),
-      category: finalCategory,
-      subcategory,
-      vendor,
-      date,
-      paymentMethod,
-      notes,
-      isRecurring,
-    };
-
     try {
-      const url = editingId ? `/api/expenses/${editingId}` : '/api/expenses';
-      const method = editingId ? 'PUT' : 'POST';
-
-      const res = await fetch(url, {
-        method,
+      const res = await fetch('/api/expenses', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          amount: parseFloat(amount),
+          vendor,
+          category,
+          date,
+          paymentMethod,
+          notes,
+          isRecurring,
+        }),
       });
+
+      const data = await res.json();
 
       if (res.ok) {
         setIsModalOpen(false);
+        setAmount('');
+        setVendor('');
+        setNotes('');
         fetchExpenses();
+      } else {
+        setFormError(data.error || 'Failed to add expense record.');
       }
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      setFormError(e.message || 'Error creating expense record.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCSVImport = async () => {
+    if (!csvContent.trim()) {
+      setImportStatus('Please paste valid CSV content.');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/expenses/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csvData: csvContent }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setImportStatus(`Successfully imported ${data.importedCount} expense records!`);
+        setTimeout(() => {
+          setIsImportModalOpen(false);
+          setCsvContent('');
+          setImportStatus('');
+          fetchExpenses();
+        }, 1200);
+      } else {
+        setImportStatus(data.error || 'CSV import failed.');
+      }
+    } catch (e: any) {
+      setImportStatus(e.message || 'CSV Import Error.');
     }
   };
 
@@ -142,201 +120,88 @@ export default function ExpensesPage() {
     fetchExpenses();
   };
 
-  // Handle CSV Parsing
-  const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setCsvFile(file);
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          setCsvPreview(results.data.slice(0, 10));
-        },
-      });
-    }
-  };
-
-  const handleCsvImport = async () => {
-    if (!csvFile) return;
-    setIsImporting(true);
-
-    Papa.parse(csvFile, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        try {
-          const res = await fetch('/api/expenses/import', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ items: results.data }),
-          });
-          if (res.ok) {
-            setIsCsvModalOpen(false);
-            setCsvFile(null);
-            setCsvPreview([]);
-            fetchExpenses();
-          }
-        } catch (e) {
-          console.error(e);
-        } finally {
-          setIsImporting(false);
-        }
-      },
-    });
-  };
-
-  const totalAmount = expenses.reduce((acc, curr) => acc + curr.amount, 0);
+  const totalExpense = expenses.reduce((acc, curr) => acc + curr.amount, 0);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Top Banner */}
+      {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Expense Tracker</h1>
-          <p className="text-xs text-slate-400 mt-1">Categorized spending, recurring subscriptions, and CSV bulk uploads</p>
+          <PageTitle>Expense Tracker</PageTitle>
+          <MutedText className="mt-1 font-medium">Categorize spending outlays, vendor details, subscriptions, and import CSV reports</MutedText>
         </div>
         <div className="flex items-center space-x-3">
-          <Button onClick={() => setIsCsvModalOpen(true)} variant="secondary">
-            <FileSpreadsheet className="mr-2 h-4 w-4 text-teal-400" /> Import CSV
+          <Button onClick={() => setIsImportModalOpen(true)} variant="secondary">
+            <Upload className="mr-2 h-4 w-4 text-teal-600 dark:text-teal-400" /> Import CSV
           </Button>
-          <Button onClick={openCreateModal} variant="danger">
-            <Plus className="mr-2 h-4 w-4" /> Add New Expense
+          <Button onClick={() => setIsModalOpen(true)} variant="danger">
+            <Plus className="mr-2 h-4 w-4" /> Add Expense
           </Button>
         </div>
       </div>
 
-      {/* Summary KPI Cards */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="border-l-4 border-l-rose-500">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Filtered Expenses</p>
-          <h3 className="text-2xl font-bold text-rose-400 mt-2">{formatCurrency(totalAmount)}</h3>
-        </Card>
-        <Card className="border-l-4 border-l-teal-500">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Transactions</p>
-          <h3 className="text-2xl font-bold text-teal-300 mt-2">{expenses.length} Records</h3>
+          <StatLabel>Total Monthly Outflow</StatLabel>
+          <h3 className="text-2xl font-extrabold text-rose-700 dark:text-rose-400 mt-2">{formatCurrency(totalExpense)}</h3>
         </Card>
         <Card className="border-l-4 border-l-amber-500">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Recurring Expenses</p>
-          <h3 className="text-2xl font-bold text-amber-300 mt-2">
-            {expenses.filter((e) => e.isRecurring).length} Subscriptions
+          <StatLabel>Tracked Expenses</StatLabel>
+          <h3 className="text-2xl font-extrabold text-amber-700 dark:text-amber-300 mt-2">{expenses.length} Entries</h3>
+        </Card>
+        <Card className="border-l-4 border-l-purple-500">
+          <StatLabel>Recurring Subscriptions</StatLabel>
+          <h3 className="text-2xl font-extrabold text-purple-700 dark:text-purple-400 mt-2">
+            {expenses.filter((e) => e.isRecurring).length} Active
           </h3>
         </Card>
       </div>
 
-      {/* Toolbar Filters */}
-      <Card className="p-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search category, vendor, notes..."
-              className="w-full rounded-xl border border-slate-800 bg-slate-950/80 py-2 pl-10 pr-4 text-xs text-slate-100 placeholder-slate-500 focus:border-teal-500 focus:outline-none"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 text-xs">
-            <div className="flex items-center space-x-2">
-              <Filter className="h-4 w-4 text-slate-400" />
-              <span className="text-slate-400">Category:</span>
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-200 focus:border-teal-500"
-              >
-                <option value="All">All Categories</option>
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <span className="text-slate-400">Payment:</span>
-              <select
-                value={paymentFilter}
-                onChange={(e) => setPaymentFilter(e.target.value)}
-                className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-200 focus:border-teal-500"
-              >
-                <option value="All">All Methods</option>
-                <option value="Bank">Bank</option>
-                <option value="UPI">UPI</option>
-                <option value="Card">Card</option>
-                <option value="Cash">Cash</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Expenses Table */}
+      {/* Expense Table */}
       <Card>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-slate-800 text-slate-400 uppercase tracking-wider">
+            <thead className="border-b border-slate-200 dark:border-slate-800">
               <tr>
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4">Category</th>
-                <th className="py-3 px-4">Vendor</th>
-                <th className="py-3 px-4">Payment Method</th>
-                <th className="py-3 px-4">Recurring</th>
-                <th className="py-3 px-4 text-right">Amount</th>
-                <th className="py-3 px-4 text-center">Actions</th>
+                <th className="py-3 px-4"><TableHeading>Vendor / Title</TableHeading></th>
+                <th className="py-3 px-4"><TableHeading>Category</TableHeading></th>
+                <th className="py-3 px-4"><TableHeading>Payment Method</TableHeading></th>
+                <th className="py-3 px-4"><TableHeading>Date</TableHeading></th>
+                <th className="py-3 px-4"><TableHeading>Recurring</TableHeading></th>
+                <th className="py-3 px-4 text-right"><TableHeading>Amount</TableHeading></th>
+                <th className="py-3 px-4 text-center"><TableHeading>Actions</TableHeading></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400">
-                    Loading expense records...
-                  </td>
+                  <td colSpan={7} className="py-8 text-center text-slate-500 dark:text-slate-400">Loading expense entries...</td>
                 </tr>
               ) : expenses.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400">
-                    No expense records found.
-                  </td>
+                  <td colSpan={7} className="py-8 text-center text-slate-500 dark:text-slate-400">No expense entries logged. Click "Add Expense" or "Import CSV" to start.</td>
                 </tr>
               ) : (
                 expenses.map((exp) => (
-                  <tr key={exp.id} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="py-3.5 px-4 text-slate-400">{formatDate(exp.date)}</td>
+                  <tr key={exp.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-slate-100">{exp.vendor || exp.notes || 'Expense'}</td>
+                    <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">{exp.category}</td>
+                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">{exp.paymentMethod}</td>
+                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">{formatDate(exp.date)}</td>
                     <td className="py-3.5 px-4">
-                      <Badge variant="expense">{exp.category}</Badge>
-                      {exp.subcategory && <span className="block text-[10px] text-slate-400 mt-0.5">{exp.subcategory}</span>}
+                      {exp.isRecurring ? <Badge variant="warning">Subscription</Badge> : <Badge variant="neutral">One-time</Badge>}
                     </td>
-                    <td className="py-3.5 px-4 font-bold text-slate-100">{exp.vendor || 'N/A'}</td>
-                    <td className="py-3.5 px-4 text-slate-300">{exp.paymentMethod}</td>
-                    <td className="py-3.5 px-4">
-                      {exp.isRecurring ? (
-                        <span className="inline-flex items-center text-amber-400 font-semibold">
-                          <RefreshCw className="mr-1 h-3 w-3 animate-spin-slow" /> Monthly
-                        </span>
-                      ) : (
-                        <span className="text-slate-500">One-off</span>
-                      )}
-                    </td>
-                    <td className="py-3.5 px-4 text-right font-bold text-rose-400">
+                    <td className="py-3.5 px-4 text-right font-extrabold text-rose-700 dark:text-rose-400">
                       -{formatCurrency(exp.amount)}
                     </td>
                     <td className="py-3.5 px-4 text-center">
-                      <div className="flex items-center justify-center space-x-2">
-                        <button
-                          onClick={() => openEditModal(exp)}
-                          className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-teal-400"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(exp.id)}
-                          className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-rose-400"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleDelete(exp.id)}
+                        className="rounded p-1 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -346,188 +211,148 @@ export default function ExpensesPage() {
         </div>
       </Card>
 
-      {/* Add / Edit Expense Modal */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={editingId ? 'Edit Expense Entry' : 'Add New Expense'}
-      >
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+      {/* Add Expense Modal */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Log New Expense">
+        <form onSubmit={handleAddExpense} className="space-y-4 text-xs">
+          {formError && (
+            <div className="rounded-xl bg-rose-100 dark:bg-rose-950/60 p-3 text-xs text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800/50 font-medium">
+              {formError}
+            </div>
+          )}
+
           <div>
-            <label className="block text-slate-300 font-semibold mb-1">Amount (₹)</label>
+            <FormLabel className="mb-1">Vendor / Description *</FormLabel>
             <input
-              type="number"
+              type="text"
               required
-              step="any"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="e.g. 15000"
-              className="w-full rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-100 focus:border-teal-500 focus:outline-none"
+              value={vendor}
+              onChange={(e) => setVendor(e.target.value)}
+              placeholder="e.g. AWS Cloud, Office Rent, Coffee Machine"
+              className="w-full rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-950 p-2.5 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-teal-600 focus:outline-none font-medium"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Category</label>
+              <FormLabel className="mb-1">Amount (₹) *</FormLabel>
+              <input
+                type="number"
+                required
+                step="any"
+                min="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="15000"
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-950 p-2.5 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-teal-600 focus:outline-none font-medium"
+              />
+            </div>
+            <div>
+              <FormLabel className="mb-1">Category *</FormLabel>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-100 focus:border-teal-500"
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-950 p-2.5 text-slate-900 dark:text-slate-100 focus:border-teal-600 font-medium"
               >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-                <option value="Custom">+ Custom Category</option>
+                <option value="Rent">Rent</option>
+                <option value="Utilities">Utilities</option>
+                <option value="Salaries">Salaries</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Software">Software</option>
+                <option value="Taxes">Taxes</option>
+                <option value="Travel">Travel</option>
+                <option value="Office Supplies">Office Supplies</option>
+                <option value="Food & Groceries">Food & Groceries</option>
+                <option value="Entertainment">Entertainment</option>
+                <option value="Other">Other</option>
               </select>
-            </div>
-
-            {category === 'Custom' && (
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Custom Category Name</label>
-                <input
-                  type="text"
-                  required
-                  value={customCategory}
-                  onChange={(e) => setCustomCategory(e.target.value)}
-                  placeholder="Category Name"
-                  className="w-full rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-100 focus:border-teal-500 focus:outline-none"
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">Vendor / Payee</label>
-              <input
-                type="text"
-                value={vendor}
-                onChange={(e) => setVendor(e.target.value)}
-                placeholder="e.g. AWS, DLF Properties"
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-100 focus:border-teal-500 focus:outline-none"
-              />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Payment Method</label>
-              <select
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as any)}
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-100 focus:border-teal-500"
-              >
-                <option value="Bank">Bank Transfer</option>
-                <option value="UPI">UPI</option>
-                <option value="Card">Card</option>
-                <option value="Cash">Cash</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">Date</label>
+              <FormLabel className="mb-1">Date *</FormLabel>
               <input
                 type="date"
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-100 focus:border-teal-500"
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-950 p-2.5 text-slate-900 dark:text-slate-100 focus:border-teal-600 font-medium"
               />
+            </div>
+            <div>
+              <FormLabel className="mb-1">Payment Method *</FormLabel>
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-950 p-2.5 text-slate-900 dark:text-slate-100 focus:border-teal-600 font-medium"
+              >
+                <option value="UPI">UPI</option>
+                <option value="Bank">Bank Transfer</option>
+                <option value="Card">Credit Card</option>
+                <option value="Cash">Cash</option>
+              </select>
             </div>
           </div>
 
           <div>
-            <label className="block text-slate-300 font-semibold mb-1">Subcategory (Optional)</label>
+            <FormLabel className="mb-1">Notes (Optional)</FormLabel>
             <input
               type="text"
-              value={subcategory}
-              onChange={(e) => setSubcategory(e.target.value)}
-              placeholder="e.g. Office Rent, Cloud Billing"
-              className="w-full rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-100 focus:border-teal-500 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-300 font-semibold mb-1">Notes (Optional)</label>
-            <textarea
-              rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Expense details..."
-              className="w-full rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-slate-100 focus:border-teal-500 focus:outline-none"
+              placeholder="Receipt info, tax notes..."
+              className="w-full rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-950 p-2.5 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-teal-600 focus:outline-none font-medium"
             />
           </div>
 
-          <div className="flex items-center space-x-2 pt-2">
+          <div className="flex items-center space-x-2 pt-1">
             <input
               type="checkbox"
-              id="isRecurringExpense"
+              id="isRecurringExp"
               checked={isRecurring}
               onChange={(e) => setIsRecurring(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-800 bg-slate-950 text-rose-600 focus:ring-rose-500"
+              className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
             />
-            <label htmlFor="isRecurringExpense" className="text-slate-300 font-medium">
-              Recurring Subscription / Monthly Outflow
+            <label htmlFor="isRecurringExp" className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+              Is this a recurring monthly subscription/outflow?
             </label>
           </div>
 
-          <div className="flex justify-end space-x-3 pt-4 border-t border-slate-800">
+          <div className="flex justify-end space-x-3 pt-4 border-t border-slate-200 dark:border-slate-800">
             <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>
               Cancel
             </Button>
             <Button type="submit" isLoading={isSubmitting} variant="danger">
-              Save Expense Record
+              Save Expense Entry
             </Button>
           </div>
         </form>
       </Modal>
 
-      {/* CSV Bulk Import Modal */}
-      <Modal
-        isOpen={isCsvModalOpen}
-        onClose={() => setIsCsvModalOpen(false)}
-        title="CSV Bulk Expense Import"
-      >
+      {/* CSV Import Modal */}
+      <Modal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} title="Import Expenses via CSV">
         <div className="space-y-4 text-xs">
-          <p className="text-slate-400">
-            Upload a CSV file containing columns: <code className="text-teal-400 font-mono">amount, category, vendor, date, paymentMethod</code>
-          </p>
+          <MutedText>
+            Paste your CSV content below with columns: <span className="font-mono font-bold text-slate-800 dark:text-slate-200">date, amount, category, vendor, paymentMethod</span>.
+          </MutedText>
 
-          <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-800 bg-slate-950/60 p-6">
-            <Upload className="h-8 w-8 text-teal-400 mb-2" />
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleCsvFileChange}
-              className="text-xs text-slate-300 file:mr-4 file:rounded-xl file:border-0 file:bg-slate-800 file:px-4 file:py-2 file:text-xs file:font-semibold file:text-teal-300 hover:file:bg-slate-700"
-            />
-          </div>
-
-          {csvPreview.length > 0 && (
-            <div>
-              <h4 className="font-bold text-slate-200 mb-2">Parsed Preview ({csvPreview.length} items sample):</h4>
-              <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-2 text-[11px] text-slate-300">
-                {csvPreview.map((row, i) => (
-                  <div key={i} className="py-1 border-b border-slate-900 flex justify-between">
-                    <span>{row.vendor || row.category}</span>
-                    <span className="font-bold text-rose-400">₹{row.amount}</span>
-                  </div>
-                ))}
-              </div>
+          {importStatus && (
+            <div className="p-3 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800/40 text-teal-900 dark:text-teal-200 font-medium">
+              {importStatus}
             </div>
           )}
 
-          <div className="flex justify-end space-x-3 pt-4 border-t border-slate-800">
-            <Button type="button" variant="ghost" onClick={() => setIsCsvModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handleCsvImport}
-              isLoading={isImporting}
-              disabled={!csvFile}
-              className="bg-teal-600 hover:bg-teal-500 text-white"
-            >
-              Import Expenses
-            </Button>
+          <textarea
+            rows={6}
+            value={csvContent}
+            onChange={(e) => setCsvContent(e.target.value)}
+            placeholder="2026-08-01, 15000, Software, AWS Hosting, Card&#10;2026-08-02, 3500, Travel, Uber Ride, UPI"
+            className="w-full rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-950 p-3 text-slate-900 dark:text-slate-100 font-mono text-xs focus:border-teal-600 focus:outline-none"
+          />
+
+          <div className="flex justify-end space-x-3 pt-2">
+            <Button variant="ghost" onClick={() => setIsImportModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleCSVImport} className="bg-teal-600 text-white">Import Expenses</Button>
           </div>
         </div>
       </Modal>

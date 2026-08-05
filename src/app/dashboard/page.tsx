@@ -17,6 +17,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { CustomChartTooltip } from '@/components/ui/ChartTooltip';
+import { PageTitle, MutedText, StatLabel, TableHeading } from '@/components/ui/Typography';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import {
   ResponsiveContainer,
@@ -31,7 +32,7 @@ import {
   Legend,
 } from 'recharts';
 
-const COLORS = ['#14b8a6', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#10b981'];
+const COLORS = ['#0d9488', '#2563eb', '#d97706', '#db2777', '#7c3aed', '#dc2626', '#059669'];
 
 export default function DashboardPage() {
   const [data, setData] = useState<any>(null);
@@ -51,8 +52,8 @@ export default function DashboardPage() {
     return (
       <div className="flex h-96 items-center justify-center">
         <div className="flex flex-col items-center space-y-3">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-teal-500 border-t-transparent"></div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Loading your financial dashboard...</p>
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-teal-600 border-t-transparent"></div>
+          <MutedText>Loading your financial dashboard...</MutedText>
         </div>
       </div>
     );
@@ -65,12 +66,12 @@ export default function DashboardPage() {
       {/* Header Banner & Quick Actions */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Financial Overview</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Real-time performance and financial health analytics</p>
+          <PageTitle>Financial Overview</PageTitle>
+          <MutedText className="mt-1 font-medium">Real-time performance and financial health analytics</MutedText>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Link href="/dashboard/income">
-            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/40">
+            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white">
               <Plus className="mr-1.5 h-4 w-4" /> Add Income
             </Button>
           </Link>
@@ -94,8 +95,8 @@ export default function DashboardPage() {
             <Sparkles className="h-5 w-5" />
           </div>
           <div className="flex-1">
-            <h4 className="text-xs font-bold text-teal-700 dark:text-teal-300 uppercase tracking-wider">AI Financial Insight</h4>
-            <p className="mt-1 text-xs text-slate-700 dark:text-slate-200 leading-relaxed">{aiInsight}</p>
+            <span className="text-xs font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider">AI Financial Insight</span>
+            <p className="mt-1 text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-medium">{aiInsight}</p>
           </div>
         </div>
       )}
@@ -105,61 +106,61 @@ export default function DashboardPage() {
         {/* Total Income */}
         <Card className="border-l-4 border-l-emerald-500">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Income</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+            <StatLabel>Total Income</StatLabel>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400">
               <TrendingUp className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-3">
-            <h2 className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(summary?.totalIncome || 0)}</h2>
-            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 flex items-center">
+            <h2 className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400">{formatCurrency(summary?.totalIncome || 0)}</h2>
+            <MutedText className="mt-1 flex items-center font-medium">
               <ArrowUpRight className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 mr-0.5" /> Current month cash inflows
-            </p>
+            </MutedText>
           </div>
         </Card>
 
         {/* Total Expense */}
         <Card className="border-l-4 border-l-rose-500">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Expense</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
+            <StatLabel>Total Expense</StatLabel>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400">
               <TrendingDown className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-3">
-            <h2 className="text-2xl font-bold text-rose-600 dark:text-rose-400">{formatCurrency(summary?.totalExpense || 0)}</h2>
-            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 flex items-center">
+            <h2 className="text-2xl font-extrabold text-rose-700 dark:text-rose-400">{formatCurrency(summary?.totalExpense || 0)}</h2>
+            <MutedText className="mt-1 flex items-center font-medium">
               <ArrowDownRight className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400 mr-0.5" /> Current month cash outflows
-            </p>
+            </MutedText>
           </div>
         </Card>
 
         {/* Net Profit */}
         <Card className="border-l-4 border-l-teal-500">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Net Profit</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-100 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400">
+            <StatLabel>Net Profit</StatLabel>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-100 dark:bg-teal-950/60 text-teal-700 dark:text-teal-400">
               <DollarSign className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-3">
-            <h2 className={`text-2xl font-bold ${summary?.netProfit >= 0 ? 'text-teal-600 dark:text-teal-300' : 'text-rose-600 dark:text-rose-400'}`}>
+            <h2 className={`text-2xl font-extrabold ${summary?.netProfit >= 0 ? 'text-teal-700 dark:text-teal-300' : 'text-rose-700 dark:text-rose-400'}`}>
               {formatCurrency(summary?.netProfit || 0)}
             </h2>
-            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Income minus expenses</p>
+            <MutedText className="mt-1 font-medium">Income minus expenses</MutedText>
           </div>
         </Card>
 
         {/* Health Score */}
         <Card className="border-l-4 border-l-amber-500">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Health Score</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+            <StatLabel>Health Score</StatLabel>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400">
               <ShieldCheck className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline justify-between">
-            <h2 className="text-2xl font-bold text-amber-600 dark:text-amber-300">{summary?.healthScore || 0}<span className="text-xs font-normal text-slate-500 dark:text-slate-400">/100</span></h2>
+            <h2 className="text-2xl font-extrabold text-amber-700 dark:text-amber-300">{summary?.healthScore || 0}<span className="text-xs font-normal text-slate-500 dark:text-slate-400">/100</span></h2>
             <Badge variant={summary?.healthScore >= 70 ? 'success' : 'warning'}>
               {summary?.healthRating || 'Fair'}
             </Badge>
@@ -182,19 +183,19 @@ export default function DashboardPage() {
               <AreaChart data={trendData}>
                 <defs>
                   <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#059669" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#059669" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#dc2626" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#dc2626" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="month" stroke="#64748b" fontSize={11} />
                 <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `₹${v / 1000}k`} />
                 <Tooltip content={<CustomChartTooltip />} />
-                <Area type="monotone" dataKey="income" name="Income" stroke="#10b981" fillOpacity={1} fill="url(#incomeGrad)" />
-                <Area type="monotone" dataKey="expense" name="Expense" stroke="#ef4444" fillOpacity={1} fill="url(#expenseGrad)" />
+                <Area type="monotone" dataKey="income" name="Income" stroke="#059669" fillOpacity={1} fill="url(#incomeGrad)" />
+                <Area type="monotone" dataKey="expense" name="Expense" stroke="#dc2626" fillOpacity={1} fill="url(#expenseGrad)" />
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>
@@ -210,7 +211,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="h-72">
             {categoryBreakdown.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-xs text-slate-500">
+              <div className="flex h-full items-center justify-center text-xs text-slate-500 dark:text-slate-400 font-medium">
                 No expense entries for this month
               </div>
             ) : (
@@ -257,17 +258,17 @@ export default function DashboardPage() {
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <thead className="border-b border-slate-200 dark:border-slate-800">
                 <tr>
-                  <th className="py-3 px-4">Type</th>
-                  <th className="py-3 px-4">Source / Vendor</th>
-                  <th className="py-3 px-4">Category</th>
-                  <th className="py-3 px-4">Payment Method</th>
-                  <th className="py-3 px-4">Date</th>
-                  <th className="py-3 px-4 text-right">Amount</th>
+                  <th className="py-3 px-4"><TableHeading>Type</TableHeading></th>
+                  <th className="py-3 px-4"><TableHeading>Source / Vendor</TableHeading></th>
+                  <th className="py-3 px-4"><TableHeading>Category</TableHeading></th>
+                  <th className="py-3 px-4"><TableHeading>Payment Method</TableHeading></th>
+                  <th className="py-3 px-4"><TableHeading>Date</TableHeading></th>
+                  <th className="py-3 px-4 text-right"><TableHeading>Amount</TableHeading></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
                 {recentTransactions.map((tx: any) => (
                   <tr key={tx.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="py-3 px-4">
@@ -275,13 +276,13 @@ export default function DashboardPage() {
                         {tx.type}
                       </Badge>
                     </td>
-                    <td className="py-3 px-4 font-semibold text-slate-900 dark:text-slate-200">
+                    <td className="py-3 px-4 font-bold text-slate-900 dark:text-slate-100">
                       {tx.source || tx.vendor || 'N/A'}
                     </td>
-                    <td className="py-3 px-4 text-slate-600 dark:text-slate-300">{tx.category}</td>
-                    <td className="py-3 px-4 text-slate-500 dark:text-slate-400">{tx.paymentMethod}</td>
-                    <td className="py-3 px-4 text-slate-500 dark:text-slate-400">{formatDate(tx.date)}</td>
-                    <td className={`py-3 px-4 text-right font-bold ${tx.type === 'Income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                    <td className="py-3 px-4 text-slate-700 dark:text-slate-300">{tx.category}</td>
+                    <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{tx.paymentMethod}</td>
+                    <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{formatDate(tx.date)}</td>
+                    <td className={`py-3 px-4 text-right font-extrabold ${tx.type === 'Income' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}`}>
                       {tx.type === 'Income' ? '+' : '-'}{formatCurrency(tx.amount)}
                     </td>
                   </tr>

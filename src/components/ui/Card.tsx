@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { CardTitleText, MutedText } from './Typography';
 
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
@@ -25,11 +26,11 @@ export function CardHeader({ children, className }: { children: React.ReactNode;
 }
 
 export function CardTitle({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <h3 className={cn('text-lg font-semibold text-slate-900 dark:text-slate-100', className)}>{children}</h3>;
+  return <CardTitleText className={className}>{children}</CardTitleText>;
 }
 
 export function CardDescription({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <p className={cn('text-sm text-slate-500 dark:text-slate-400', className)}>{children}</p>;
+  return <MutedText className={className}>{children}</MutedText>;
 }
 
 export function CardContent({ children, className }: { children: React.ReactNode; className?: string }) {

@@ -3,8 +3,9 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Sparkles, Lock, Mail, User, ArrowRight } from 'lucide-react';
+import { Sparkles, ArrowRight, Lock, Mail, User, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { PageTitle, MutedText, FormLabel } from '@/components/ui/Typography';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -27,93 +28,94 @@ export default function SignupPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Signup failed');
-      }
 
-      router.push('/dashboard');
+      if (res.ok) {
+        router.push('/dashboard');
+      } else {
+        setError(data.error || 'Registration failed.');
+      }
     } catch (err: any) {
-      setError(err.message);
+      setError('Network error. Please try again later.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-12">
-      <div className="w-full max-w-md space-y-8 rounded-3xl border border-slate-800 bg-slate-900/80 p-8 shadow-2xl backdrop-blur-xl">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950 px-4 py-12 text-slate-900 dark:text-slate-100 transition-colors">
+      <div className="w-full max-w-md space-y-8 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-2xl">
         <div className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-teal-700 text-white shadow-xl glow-teal">
-            <Sparkles className="h-7 w-7" />
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-600 text-white shadow-lg glow-teal">
+            <Sparkles className="h-6 w-6" />
           </div>
-          <h2 className="mt-4 text-2xl font-extrabold text-slate-100 tracking-tight">Create Workspace</h2>
-          <p className="mt-2 text-xs text-slate-400">Get your private AI-powered financial management dashboard</p>
+          <PageTitle className="mt-4">Create Account</PageTitle>
+          <MutedText className="mt-1.5 font-medium">Get started with your private AI-powered financial management workspace</MutedText>
         </div>
 
         {error && (
-          <div className="rounded-xl bg-rose-950/60 p-3 text-xs text-rose-300 border border-rose-800/50">
-            {error}
+          <div className="flex items-center space-x-2 rounded-xl bg-rose-100 dark:bg-rose-950/60 p-3 text-xs font-semibold text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800/50">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Username</label>
+            <FormLabel className="mb-1">Username *</FormLabel>
             <div className="relative">
-              <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
               <input
                 type="text"
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="johndoe"
-                className="w-full rounded-xl border border-slate-800 bg-slate-950/80 py-2.5 pl-10 pr-4 text-sm text-slate-100 placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-950 py-3 pl-10 pr-4 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:border-teal-600 focus:outline-none font-semibold"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Email Address</label>
+            <FormLabel className="mb-1">Email Address *</FormLabel>
             <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="john@example.com"
-                className="w-full rounded-xl border border-slate-800 bg-slate-950/80 py-2.5 pl-10 pr-4 text-sm text-slate-100 placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-950 py-3 pl-10 pr-4 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:border-teal-600 focus:outline-none font-semibold"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Password</label>
+            <FormLabel className="mb-1">Password *</FormLabel>
             <div className="relative">
-              <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 6 characters"
-                className="w-full rounded-xl border border-slate-800 bg-slate-950/80 py-2.5 pl-10 pr-4 text-sm text-slate-100 placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                placeholder="Minimum 6 characters"
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-950 py-3 pl-10 pr-4 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:border-teal-600 focus:outline-none font-semibold"
               />
             </div>
           </div>
 
-          <Button type="submit" isLoading={isLoading} className="w-full py-3">
-            <span>Create Free Account</span>
-            <ArrowRight className="ml-2 h-4 w-4" />
+          <Button type="submit" isLoading={isLoading} className="w-full bg-teal-600 hover:bg-teal-500 py-3 text-white font-bold mt-2">
+            Create Account & Launch Workspace <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </form>
 
-        <p className="text-center text-xs text-slate-400">
-          Already have an account?{' '}
-          <Link href="/login" className="font-semibold text-teal-400 hover:underline">
-            Log in here
+        <div className="text-center text-xs">
+          <span className="text-slate-600 dark:text-slate-400 font-medium">Already have an account? </span>
+          <Link href="/login" className="font-bold text-teal-700 dark:text-teal-400 hover:underline">
+            Sign In
           </Link>
-        </p>
+        </div>
       </div>
     </div>
   );
