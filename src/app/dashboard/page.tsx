@@ -227,6 +227,7 @@ export default function DashboardPage() {
                     dataKey="value"
                     isAnimationActive={false}
                     stroke="none"
+                    legendType="none"
                     className="fill-slate-900 dark:fill-slate-100"
                   />
                   <Pie
