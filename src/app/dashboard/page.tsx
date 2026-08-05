@@ -217,6 +217,18 @@ export default function DashboardPage() {
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <RePieChart>
+                  {/* Outer theme-aware ring border */}
+                  <Pie
+                    data={[{ value: 1 }]}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={82}
+                    outerRadius={84.5}
+                    dataKey="value"
+                    isAnimationActive={false}
+                    stroke="none"
+                    className="fill-slate-900 dark:fill-slate-100"
+                  />
                   <Pie
                     data={categoryBreakdown}
                     cx="50%"
