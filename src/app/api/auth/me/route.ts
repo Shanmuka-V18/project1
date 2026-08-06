@@ -1,92 +1,73 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser, hashPassword, comparePassword } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { z } from 'zod';
 
 export async function GET() {
   const currentUser = await getCurrentUser();
+
   if (!currentUser) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ user: null }, { status: 401 });
   }
 
-  const user = await prisma.user.findUnique({
+  const dbUser = await prisma.user.findUnique({
     where: { id: currentUser.userId },
     select: {
       id: true,
       username: true,
       email: true,
+      phoneNumber: true,
       profilePictureUrl: true,
       createdAt: true,
     },
   });
 
-  if (!user) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
-  }
-
-  return NextResponse.json({ user });
+  return NextResponse.json({ user: dbUser });
 }
-
-const updateProfileSchema = z.object({
-  profilePictureUrl: z.string().optional(),
-  currentPassword: z.string().optional(),
-  newPassword: z.string().min(6, 'New password must be at least 6 characters').optional(),
-});
 
 export async function PUT(request: Request) {
   const currentUser = await getCurrentUser();
+
   if (!currentUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
     const body = await request.json();
-    const validated = updateProfileSchema.parse(body);
+    const { phoneNumber } = body;
 
-    const user = await prisma.user.findUnique({
-      where: { id: currentUser.userId },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    const updateData: any = {};
-
-    if (validated.profilePictureUrl !== undefined) {
-      updateData.profilePictureUrl = validated.profilePictureUrl;
-    }
-
-    if (validated.newPassword) {
-      if (!validated.currentPassword) {
-        return NextResponse.json({ error: 'Current password is required to change password' }, { status: 400 });
+    if (phoneNumber !== undefined && phoneNumber !== null && phoneNumber.trim() !== '') {
+      const trimmed = phoneNumber.trim();
+      if (!/^\d+$/.test(trimmed)) {
+        return NextResponse.json(
+          { error: 'Phone number must contain digits only (0–9).' },
+          { status: 400 }
+        );
       }
-
-      const isMatch = await comparePassword(validated.currentPassword, user.passwordHash);
-      if (!isMatch) {
-        return NextResponse.json({ error: 'Incorrect current password' }, { status: 400 });
+      if (trimmed.length < 10 || trimmed.length > 15) {
+        return NextResponse.json(
+          { error: 'Phone number must be between 10 and 15 digits long.' },
+          { status: 400 }
+        );
       }
-
-      updateData.passwordHash = await hashPassword(validated.newPassword);
     }
 
     const updatedUser = await prisma.user.update({
       where: { id: currentUser.userId },
-      data: updateData,
+      data: {
+        phoneNumber: phoneNumber ? phoneNumber.trim() : null,
+      },
       select: {
         id: true,
         username: true,
         email: true,
+        phoneNumber: true,
         profilePictureUrl: true,
         createdAt: true,
       },
     });
 
-    return NextResponse.json({ message: 'Profile updated successfully', user: updatedUser });
+    return NextResponse.json({ user: updatedUser, message: 'Profile updated successfully' });
   } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors[0].message }, { status: 400 });
-    }
-    return NextResponse.json({ error: error.message || 'Update failed' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Failed to update profile' }, { status: 500 });
   }
 }
