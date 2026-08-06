@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { PageTitle, MutedText, FormLabel, TableHeading, StatLabel, SectionTitle, BodyText } from '@/components/ui/Typography';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { calculateGST, GSTCalculationResult } from '@/lib/gst-utils';
 
 export default function GSTPage() {
   const [amount, setAmount] = useState<string>('100000');
@@ -14,7 +15,7 @@ export default function GSTPage() {
   const [transactionType, setTransactionType] = useState<'Intra-State' | 'Inter-State'>('Intra-State');
   const [isInclusive, setIsInclusive] = useState<boolean>(false);
 
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<GSTCalculationResult | null>(null);
   const [aiExplanation, setAiExplanation] = useState<string>('');
   const [isExplaining, setIsExplaining] = useState<boolean>(false);
   const [history, setHistory] = useState<any[]>([]);
@@ -37,42 +38,12 @@ export default function GSTPage() {
     const numAmount = parseFloat(amount);
     if (!numAmount || numAmount <= 0) return;
 
-    let baseAmount = numAmount;
-    let gstAmt = 0;
-    let finalAmt = numAmount;
-
-    if (isInclusive) {
-      baseAmount = numAmount / (1 + gstRate / 100);
-      gstAmt = numAmount - baseAmount;
-      finalAmt = numAmount;
-    } else {
-      gstAmt = (numAmount * gstRate) / 100;
-      finalAmt = numAmount + gstAmt;
-    }
-
-    let cgst = 0;
-    let sgst = 0;
-    let igst = 0;
-
-    if (transactionType === 'Intra-State') {
-      cgst = gstAmt / 2;
-      sgst = gstAmt / 2;
-    } else {
-      igst = gstAmt;
-    }
-
-    const calcResult = {
+    const calcResult = calculateGST({
       amount: numAmount,
-      baseAmount,
       gstRate,
       transactionType,
       isInclusive,
-      gstAmount: gstAmt,
-      cgst,
-      sgst,
-      igst,
-      finalAmount: finalAmt,
-    };
+    });
 
     setResult(calcResult);
 
@@ -82,13 +53,13 @@ export default function GSTPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: numAmount,
-          gstRate,
-          transactionType,
-          cgst,
-          sgst,
-          igst,
-          finalAmount: finalAmt,
+          amount: calcResult.amount,
+          gstRate: calcResult.gstRate,
+          transactionType: calcResult.transactionType,
+          cgst: calcResult.cgst,
+          sgst: calcResult.sgst,
+          igst: calcResult.igst,
+          finalAmount: calcResult.finalAmount,
         }),
       });
       fetchHistory();
@@ -98,7 +69,7 @@ export default function GSTPage() {
     explainWithAI(calcResult);
   };
 
-  const explainWithAI = async (calcResult: any) => {
+  const explainWithAI = async (calcResult: GSTCalculationResult) => {
     setIsExplaining(true);
     setAiExplanation('');
     try {
@@ -120,7 +91,7 @@ export default function GSTPage() {
     <div className="space-y-8 max-w-5xl mx-auto animate-in fade-in duration-300">
       <div>
         <PageTitle>GST Calculator & Tax Advisor</PageTitle>
-        <MutedText className="mt-1 font-medium">Compute Intra-State (CGST + SGST) and Inter-State (IGST) taxes with AI plain-language tax explanations</MutedText>
+        <MutedText className="mt-1 font-medium">Compute Intra-State (CGST + SGST) and Inter-State (IGST) taxes with GST Inclusive / Exclusive modes</MutedText>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -130,7 +101,9 @@ export default function GSTPage() {
 
           <form onSubmit={handleCalculate} className="space-y-4 text-xs">
             <div>
-              <FormLabel className="mb-1">Transaction Amount (₹) *</FormLabel>
+              <FormLabel className="mb-1">
+                {isInclusive ? 'Gross Amount (GST Included) *' : 'Transaction Amount *'}
+              </FormLabel>
               <input
                 type="number"
                 required
@@ -197,9 +170,9 @@ export default function GSTPage() {
                 id="isInclusive"
                 checked={isInclusive}
                 onChange={(e) => setIsInclusive(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
               />
-              <label htmlFor="isInclusive" className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+              <label htmlFor="isInclusive" className="text-xs font-semibold text-slate-800 dark:text-slate-200 cursor-pointer">
                 Amount is GST Inclusive (Extract tax component)
               </label>
             </div>
@@ -213,7 +186,9 @@ export default function GSTPage() {
         {/* Results Card */}
         <Card className="lg:col-span-6 p-6 flex flex-col justify-between">
           <div>
-            <SectionTitle className="mb-4 text-teal-700 dark:text-teal-400">Tax Breakdown Output</SectionTitle>
+            <SectionTitle className="mb-4 text-teal-700 dark:text-teal-400">
+              Tax Breakdown Output ({result?.isInclusive ? 'GST Inclusive' : 'GST Exclusive'})
+            </SectionTitle>
 
             {!result ? (
               <div className="py-16 text-center text-xs text-slate-500 dark:text-slate-400 font-medium">
@@ -222,7 +197,9 @@ export default function GSTPage() {
             ) : (
               <div className="space-y-3 text-xs">
                 <div className="flex justify-between p-3 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                  <span className="text-slate-600 dark:text-slate-400 font-medium">Base Net Amount:</span>
+                  <span className="text-slate-600 dark:text-slate-400 font-medium">
+                    {result.isInclusive ? 'Base Net Amount (Excl. Tax):' : 'Base Net Amount:'}
+                  </span>
                   <span className="font-bold text-slate-900 dark:text-slate-100">{formatCurrency(result.baseAmount)}</span>
                 </div>
 
@@ -244,8 +221,15 @@ export default function GSTPage() {
                   </div>
                 )}
 
+                <div className="flex justify-between p-3 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 font-semibold">
+                  <span className="text-slate-600 dark:text-slate-400">Total GST Tax Amount:</span>
+                  <span className="font-bold text-teal-700 dark:text-teal-400">{formatCurrency(result.gstAmount)}</span>
+                </div>
+
                 <div className="flex justify-between p-4 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-300 dark:border-teal-800 text-sm font-extrabold">
-                  <span className="text-teal-900 dark:text-teal-300">Final Gross Amount:</span>
+                  <span className="text-teal-900 dark:text-teal-300">
+                    {result.isInclusive ? 'Final Amount (Same as Input):' : 'Final Gross Amount:'}
+                  </span>
                   <span className="text-teal-900 dark:text-teal-300">{formatCurrency(result.finalAmount)}</span>
                 </div>
               </div>
@@ -266,7 +250,9 @@ export default function GSTPage() {
                     <span>Consulting AI Tax Engine...</span>
                   </div>
                 ) : (
-                  aiExplanation || 'Intra-state supply splits tax equally into CGST and SGST.'
+                  aiExplanation || (result.isInclusive
+                    ? `GST Inclusive calculation extracted ₹${result.gstAmount.toLocaleString('en-IN')} tax component from the ₹${result.amount.toLocaleString('en-IN')} gross amount.`
+                    : `GST Exclusive calculation added ₹${result.gstAmount.toLocaleString('en-IN')} tax to the ₹${result.amount.toLocaleString('en-IN')} base amount.`)
                 )}
               </div>
             </div>

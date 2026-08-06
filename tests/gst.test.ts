@@ -1,42 +1,74 @@
 import { describe, it, expect } from 'vitest';
-import { calculateGST } from '../src/lib/utils';
+import { calculateGST } from '../src/lib/gst-utils';
 
 describe('GST Calculator Engine', () => {
-  it('correctly calculates 18% Intra-State GST (50% CGST + 50% SGST)', () => {
-    const result = calculateGST(100000, 18, 'Intra-State');
-    expect(result.amount).toBe(100000);
-    expect(result.gstRate).toBe(18);
-    expect(result.totalTax).toBe(18000);
-    expect(result.cgst).toBe(9000);
-    expect(result.sgst).toBe(9000);
-    expect(result.igst).toBe(0);
-    expect(result.finalAmount).toBe(118000);
+  describe('GST Exclusive Mode (Unchecked)', () => {
+    it('correctly calculates 18% Intra-State GST (50% CGST + 50% SGST)', () => {
+      const result = calculateGST({
+        amount: 100000,
+        gstRate: 18,
+        transactionType: 'Intra-State',
+        isInclusive: false,
+      });
+
+      expect(result.amount).toBe(100000);
+      expect(result.baseAmount).toBe(100000);
+      expect(result.gstRate).toBe(18);
+      expect(result.gstAmount).toBe(18000);
+      expect(result.cgst).toBe(9000);
+      expect(result.sgst).toBe(9000);
+      expect(result.igst).toBe(0);
+      expect(result.finalAmount).toBe(118000);
+    });
+
+    it('correctly calculates 18% Inter-State GST (100% IGST)', () => {
+      const result = calculateGST({
+        amount: 100000,
+        gstRate: 18,
+        transactionType: 'Inter-State',
+        isInclusive: false,
+      });
+
+      expect(result.baseAmount).toBe(100000);
+      expect(result.gstAmount).toBe(18000);
+      expect(result.cgst).toBe(0);
+      expect(result.sgst).toBe(0);
+      expect(result.igst).toBe(18000);
+      expect(result.finalAmount).toBe(118000);
+    });
   });
 
-  it('correctly calculates 18% Inter-State GST (100% IGST)', () => {
-    const result = calculateGST(100000, 18, 'Inter-State');
-    expect(result.amount).toBe(100000);
-    expect(result.gstRate).toBe(18);
-    expect(result.totalTax).toBe(18000);
-    expect(result.cgst).toBe(0);
-    expect(result.sgst).toBe(0);
-    expect(result.igst).toBe(18000);
-    expect(result.finalAmount).toBe(118000);
-  });
+  describe('GST Inclusive Mode (Checked)', () => {
+    it('extracts 18% Intra-State tax component from gross amount (₹100,000 -> Base ₹84,745.76, Tax ₹15,254.24, Final ₹100,000)', () => {
+      const result = calculateGST({
+        amount: 100000,
+        gstRate: 18,
+        transactionType: 'Intra-State',
+        isInclusive: true,
+      });
 
-  it('correctly handles 0% GST rate', () => {
-    const result = calculateGST(50000, 0, 'Intra-State');
-    expect(result.totalTax).toBe(0);
-    expect(result.cgst).toBe(0);
-    expect(result.sgst).toBe(0);
-    expect(result.finalAmount).toBe(50000);
-  });
+      expect(result.finalAmount).toBe(100000);
+      expect(result.baseAmount).toBe(84745.76);
+      expect(result.gstAmount).toBe(15254.24);
+      expect(result.cgst).toBe(7627.12);
+      expect(result.sgst).toBe(7627.12);
+      expect(result.igst).toBe(0);
+    });
 
-  it('correctly handles 12% Intra-State rate', () => {
-    const result = calculateGST(45000, 12, 'Intra-State');
-    expect(result.totalTax).toBe(5400);
-    expect(result.cgst).toBe(2700);
-    expect(result.sgst).toBe(2700);
-    expect(result.finalAmount).toBe(50400);
+    it('extracts 18% Inter-State IGST from gross amount', () => {
+      const result = calculateGST({
+        amount: 100000,
+        gstRate: 18,
+        transactionType: 'Inter-State',
+        isInclusive: true,
+      });
+
+      expect(result.finalAmount).toBe(100000);
+      expect(result.baseAmount).toBe(84745.76);
+      expect(result.gstAmount).toBe(15254.24);
+      expect(result.cgst).toBe(0);
+      expect(result.sgst).toBe(0);
+      expect(result.igst).toBe(15254.24);
+    });
   });
 });
