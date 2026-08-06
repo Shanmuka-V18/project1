@@ -56,6 +56,7 @@ export default function GSTPage() {
           amount: calcResult.amount,
           gstRate: calcResult.gstRate,
           transactionType: calcResult.transactionType,
+          isInclusive: calcResult.isInclusive,
           cgst: calcResult.cgst,
           sgst: calcResult.sgst,
           igst: calcResult.igst,

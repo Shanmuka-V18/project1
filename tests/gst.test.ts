@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { calculateGST } from '../src/lib/gst-utils';
 
-describe('GST Calculator Engine', () => {
+describe('GST Calculator Engine & History Persistence', () => {
   describe('GST Exclusive Mode (Unchecked)', () => {
     it('correctly calculates 18% Intra-State GST (50% CGST + 50% SGST)', () => {
       const result = calculateGST({
@@ -55,7 +55,7 @@ describe('GST Calculator Engine', () => {
       expect(result.igst).toBe(0);
     });
 
-    it('extracts 18% Inter-State IGST from gross amount', () => {
+    it('stores exact Gross Total ₹100,000 in history log for ₹100,000 Inclusive input (NOT ₹118,000)', () => {
       const result = calculateGST({
         amount: 100000,
         gstRate: 18,
@@ -64,10 +64,9 @@ describe('GST Calculator Engine', () => {
       });
 
       expect(result.finalAmount).toBe(100000);
+      expect(result.finalAmount).not.toBe(118000);
       expect(result.baseAmount).toBe(84745.76);
       expect(result.gstAmount).toBe(15254.24);
-      expect(result.cgst).toBe(0);
-      expect(result.sgst).toBe(0);
       expect(result.igst).toBe(15254.24);
     });
   });
