@@ -52,6 +52,11 @@ export default function AIAssistantPage() {
       const data = await response.json();
       if (data.reply) {
         setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
+      } else if (data.error) {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: `Notice: ${data.error}. Please try another question.` },
+        ]);
       } else {
         setMessages((prev) => [
           ...prev,
@@ -61,7 +66,7 @@ export default function AIAssistantPage() {
     } catch (error) {
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: 'Network error. Please verify your connection.' },
+        { role: 'assistant', content: 'Network error. Please verify your server connection.' },
       ]);
     } finally {
       setIsLoading(false);
