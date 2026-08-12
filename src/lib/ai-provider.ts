@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateGeminiContent } from './gemini-config';
 
 export interface AICallParams {
   systemPrompt: string;
@@ -100,26 +100,12 @@ export async function callAIProvider({ systemPrompt, userMessage }: AICallParams
     }
   }
 
-  // 3. Google Gemini Key (starts with AIzaSy or AQ. or any non-Groq/xAI key)
-  if (activeKey.startsWith('AIzaSy') || activeKey.startsWith('AQ.') || (!activeKey.startsWith('gsk_') && !activeKey.startsWith('xai-'))) {
-    try {
-      const genAI = new GoogleGenerativeAI(activeKey);
-      const candidateModels = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp'];
-      const fullPrompt = `${systemPrompt}\n\nUser Question: ${userMessage}`;
-
-      for (const modelName of candidateModels) {
-        try {
-          const model = genAI.getGenerativeModel({ model: modelName });
-          const result = await model.generateContent(fullPrompt);
-          const text = result.response.text();
-          if (text) return text.trim();
-        } catch (mErr: any) {
-          console.warn(`[Gemini Model ${modelName} failed in provider]:`, mErr?.message || mErr);
-        }
-      }
-    } catch (err: any) {
-      console.warn('[Google Gemini API Error]:', err?.message || err);
-    }
+  // 3. Google Gemini Execution via Centralized Engine
+  try {
+    const text = await generateGeminiContent({ systemInstruction: systemPrompt, prompt: userMessage });
+    if (text) return text;
+  } catch (err: any) {
+    console.warn('[Google Gemini Provider Error]:', err?.message || err);
   }
 
   return null;

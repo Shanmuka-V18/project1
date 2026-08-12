@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateGeminiContent } from '@/lib/gemini-config';
 
 export async function POST(request: Request) {
   const currentUser = await getCurrentUser();
@@ -20,11 +20,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ explanation });
     }
 
-    try {
-      const genAI = new GoogleGenerativeAI(rawApiKey);
-      const candidateModels = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp'];
+    const systemPrompt = `You are an expert Indian Chartered Accountant (CA) AI assistant. Explain GST calculations in clear, friendly, plain English for a non-accountant business owner. Keep explanations concise (max 3-4 bullet points or short paragraphs).`;
 
-      const prompt = `You are an expert Indian Chartered Accountant (CA) AI assistant. Explain the following GST calculation in clear, friendly, plain English for a non-accountant business owner:
+    const userPrompt = `Explain this GST calculation:
 - Base Taxable Amount: ₹${amount}
 - GST Rate: ${gstRate}%
 - Transaction Type: ${transactionType}
@@ -32,39 +30,24 @@ export async function POST(request: Request) {
 - CGST: ₹${cgst}
 - SGST: ₹${sgst}
 - IGST: ₹${igst}
-- Final Amount: ₹${finalAmount}
+- Final Amount: ₹${finalAmount}`;
 
-Keep your explanation concise (max 3 bullet points or short paragraphs), clear, and professional.`;
-
-      let explanation = '';
-      let lastErr: any = null;
-
-      for (const modelName of candidateModels) {
-        try {
-          const model = genAI.getGenerativeModel({ model: modelName });
-          const result = await model.generateContent(prompt);
-          explanation = result.response.text();
-          if (explanation) break;
-        } catch (mErr: any) {
-          lastErr = mErr;
-          console.warn(`[GST Explain Model ${modelName} failed]:`, mErr?.message || mErr);
-        }
-      }
-
-      if (!explanation) {
-        throw lastErr || new Error('All Gemini model candidates failed to respond.');
-      }
+    try {
+      const explanation = await generateGeminiContent({
+        systemInstruction: systemPrompt,
+        prompt: userPrompt,
+      });
 
       return NextResponse.json({ explanation });
-    } catch (apiError: any) {
-      console.error('[GST Explain Gemini API Error]:', apiError?.message || apiError);
+    } catch (geminiErr: any) {
+      console.error('[GST Explain Gemini Error]:', geminiErr?.message || geminiErr);
       return NextResponse.json(
-        { error: `GST AI Advisor Error: ${apiError?.message || 'Gemini API call failed'}` },
+        { error: "GST Advisor is temporarily unavailable — please try again in a moment." },
         { status: 500 }
       );
     }
   } catch (error: any) {
     console.error('[GST Explain Route Error]:', error);
-    return NextResponse.json({ error: error.message || 'Failed to explain GST calculation' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to explain GST calculation' }, { status: 500 });
   }
 }

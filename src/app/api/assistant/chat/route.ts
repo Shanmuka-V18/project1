@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { calculateFinancialHealthScore } from '@/lib/utils';
+import { generateGeminiContent } from '@/lib/gemini-config';
 
 export async function POST(request: Request) {
   const currentUser = await getCurrentUser();
@@ -90,7 +90,7 @@ Instructions:
 
     const rawApiKey = (process.env.GEMINI_API_KEY || '').trim();
 
-    // 1. If key is missing or unconfigured placeholder, return explicitly labeled offline demo response
+    // 1. Unconfigured API Key -> Explicit Offline Demo Mode
     if (!rawApiKey || rawApiKey === 'your-google-gemini-api-key-here') {
       const lowerMsg = message.toLowerCase();
       let demoContent = '';
@@ -110,55 +110,44 @@ Instructions:
       return NextResponse.json({ reply: replyText, isOffline: true });
     }
 
-    // 2. Live Gemini API execution via official @google/generative-ai SDK with model fallback chain
-    const genAI = new GoogleGenerativeAI(rawApiKey);
-    const candidateModels = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp'];
-    let replyText = '';
-    let lastError: any = null;
+    // 2. Live Gemini Execution via Centralized Config Engine
+    try {
+      const replyText = await generateGeminiContent({
+        systemInstruction: systemPrompt,
+        prompt: `User Question: ${message}`,
+      });
 
-    const fullPrompt = `${systemPrompt}\n\nUser Question: ${message}`;
+      // Save conversation to DB
+      const updatedMessages = [
+        ...conversationHistory,
+        { role: 'user', content: message, timestamp: new Date().toISOString() },
+        { role: 'assistant', content: replyText, timestamp: new Date().toISOString() },
+      ];
 
-    for (const modelName of candidateModels) {
       try {
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent(fullPrompt);
-        replyText = result.response.text();
-        if (replyText) break;
-      } catch (modelErr: any) {
-        lastError = modelErr;
-        console.warn(`[Gemini Model ${modelName} call failed, trying next candidate]:`, modelErr?.message || modelErr);
-      }
-    }
+        await prisma.aIConversation.create({
+          data: {
+            userId: currentUser.userId,
+            messages: JSON.stringify(updatedMessages),
+          },
+        });
+      } catch (dbErr) {}
 
-    if (!replyText) {
-      console.error('[All Gemini Models Failed]:', lastError?.message || lastError);
+      return NextResponse.json({ reply: replyText, conversation: updatedMessages });
+    } catch (geminiError: any) {
+      // LOG TECHNICAL SERVER-SIDE ERROR FOR DIAGNOSTICS
+      console.error('[AI Assistant Chat Route - Gemini Error]:', geminiError?.message || geminiError, geminiError?.stack);
+
+      // USER-FRIENDLY ERROR RESPONSE (SHELTERING CLIENT FROM RAW STACK TRACES)
       return NextResponse.json(
         {
-          error: `Gemini API Call Failed: ${lastError?.message || 'Unable to connect to Google Generative Language API'}. Check server logs.`,
+          error: "I'm having trouble connecting right now — please try again in a moment.",
         },
         { status: 500 }
       );
     }
-
-    // Save conversation to DB
-    const updatedMessages = [
-      ...conversationHistory,
-      { role: 'user', content: message, timestamp: new Date().toISOString() },
-      { role: 'assistant', content: replyText, timestamp: new Date().toISOString() },
-    ];
-
-    try {
-      await prisma.aIConversation.create({
-        data: {
-          userId: currentUser.userId,
-          messages: JSON.stringify(updatedMessages),
-        },
-      });
-    } catch (dbErr) {}
-
-    return NextResponse.json({ reply: replyText, conversation: updatedMessages });
   } catch (error: any) {
     console.error('[AI Assistant Route Exception]:', error);
-    return NextResponse.json({ error: error.message || 'AI Assistant request failed' }, { status: 500 });
+    return NextResponse.json({ error: "I'm having trouble connecting right now — please try again in a moment." }, { status: 500 });
   }
 }
