@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { calculateFinancialHealthScore } from '@/lib/utils';
-import { callAIProvider } from '@/lib/ai-provider';
 
 export async function POST(request: Request) {
   const currentUser = await getCurrentUser();
@@ -88,62 +88,73 @@ Instructions:
 4. Format your responses with markdown bolding, lists, and clear money formatting in INR (₹).
 5. Be concise, professional, supportive, and actionable.`;
 
-    // Smart contextual response generator function if no live key is present
-    const generateSmartFallback = (query: string): string => {
-      const lowerMsg = query.toLowerCase();
+    const rawApiKey = (process.env.GEMINI_API_KEY || '').trim();
+
+    // 1. If key is missing or unconfigured placeholder, return explicitly labeled offline demo response
+    if (!rawApiKey || rawApiKey === 'your-google-gemini-api-key-here') {
+      const lowerMsg = message.toLowerCase();
+      let demoContent = '';
 
       if (lowerMsg.includes('spend') || lowerMsg.includes('expense') || lowerMsg.includes('highest')) {
-        return `Based on your records for this month:\n\n- **Total Monthly Expenses:** ₹${totalExpense.toLocaleString('en-IN')}\n- **Top Categories:** ${
+        demoContent = `Based on your records for this month:\n\n- **Total Monthly Expenses:** ₹${totalExpense.toLocaleString('en-IN')}\n- **Top Categories:** ${
           Object.entries(expenseCategoryMap).map(([c, a]) => `\n  - **${c}:** ₹${a.toLocaleString('en-IN')}`).join('') || '\n  - No expenses logged yet.'
         }\n- **Net Savings:** ₹${netProfit.toLocaleString('en-IN')}`;
-      }
-      
-      if (lowerMsg.includes('afford')) {
-        return `Your current net profit / savings for this month is **₹${netProfit.toLocaleString('en-IN')}** with a Financial Health Score of **${health.score}/100** (${health.rating}).\n\nIf the purchase fits within your remaining net profit margin of ₹${netProfit.toLocaleString('en-IN')}, you can comfortably afford it without drawing down emergency reserves.`;
-      }
-      
-      if (lowerMsg.includes('gst') || lowerMsg.includes('tax')) {
-        return `Here is a summary of Indian GST calculation principles:\n- **Intra-State (Within Same State):** Split 50-50 into **CGST** and **SGST**.\n- **Inter-State (Different State):** Full tax rate as **IGST**.\n\nRecent calculations logged in your account:\n${
-          recentGst.map(g => `- ₹${g.amount.toLocaleString('en-IN')} at ${g.gstRate}% ${g.transactionType} -> Gross ₹${g.finalAmount.toLocaleString('en-IN')}`).join('\n') || '- No recent GST logs recorded.'
-        }\n\nYou can use our dedicated GST Calculator tab for precise inclusive/exclusive calculations.`;
-      }
-      
-      if (lowerMsg.includes('health') || lowerMsg.includes('score')) {
-        return `Your Financial Health Score is **${health.score}/100 (${health.rating})**.\n\n**Contributing Factors:**\n- Savings Rate: ${health.factors.savingsRateScore}/25\n- Expense Ratio: ${health.factors.expenseRatioScore}/25\n- Budget Adherence: ${health.factors.budgetAdherenceScore}/25\n- Emergency Reserve: ${health.factors.emergencyFundScore}/15\n\n**Tip:** ${health.suggestions[0] || 'Keep up the good financial discipline!'}`;
+      } else if (lowerMsg.includes('afford')) {
+        demoContent = `Your current net profit / savings for this month is **₹${netProfit.toLocaleString('en-IN')}** with a Financial Health Score of **${health.score}/100** (${health.rating}).\n\nIf the purchase fits within your remaining net profit margin of ₹${netProfit.toLocaleString('en-IN')}, you can comfortably afford it without drawing down emergency reserves.`;
+      } else {
+        demoContent = `Here is your financial snapshot for this month:\n- **Total Income:** ₹${totalIncome.toLocaleString('en-IN')}\n- **Total Expenses:** ₹${totalExpense.toLocaleString('en-IN')}\n- **Net Savings:** ₹${netProfit.toLocaleString('en-IN')}\n- **Financial Health Score:** ${health.score}/100 (${health.rating})`;
       }
 
-      if (lowerMsg.includes('tip') || lowerMsg.includes('advice') || lowerMsg.includes('save') || lowerMsg.includes('strategy')) {
-        return `Here are 5 actionable financial & tax-saving strategies tailored for you:\n\n1. **Section 80C Deductions:** Utilize ELSS mutual funds, PPF, or EPF up to ₹1.5 Lakh per fiscal year.\n2. **Section 80D Health Insurance:** Claim tax deductions up to ₹25,000 for personal health insurance premiums.\n3. **Budget Monitoring:** Keep your monthly expense-to-income ratio below 70% (currently at ${totalIncome > 0 ? Math.round((totalExpense / totalIncome) * 100) : 0}%).\n4. **Timely Invoice Follow-ups:** You have active invoices totaling ₹${recentInvoices.reduce((a, i) => a + i.total, 0).toLocaleString('en-IN')}.\n5. **Emergency Reserve:** Build 3–6 months of living expenses in liquid high-yield savings.`;
-      }
+      const replyText = `[Offline Demo Mode — Configure GEMINI_API_KEY in .env for Live AI]\n\n${demoContent}`;
 
-      return `Here is your current financial snapshot for this month (${now.toLocaleString('en-IN', { month: 'long', year: 'numeric' })}):\n- **Total Income:** ₹${totalIncome.toLocaleString('en-IN')}\n- **Total Expenses:** ₹${totalExpense.toLocaleString('en-IN')}\n- **Net Savings / Profit:** ₹${netProfit.toLocaleString('en-IN')}\n- **Financial Health Score:** ${health.score}/100 (${health.rating})\n\nHow else can I assist you with your taxes, budgets, or invoice planning today?`;
-    };
-
-    // Call Multi-Provider AI (Groq, xAI Grok, or Google Gemini)
-    const aiReply = await callAIProvider({ systemPrompt, userMessage: message });
-
-    const replyText = aiReply || generateSmartFallback(message);
-
-    // Save conversation to DB
-    const updatedMessages = [
-      ...conversationHistory,
-      { role: 'user', content: message, timestamp: new Date().toISOString() },
-      { role: 'assistant', content: replyText, timestamp: new Date().toISOString() },
-    ];
-
-    try {
-      await prisma.aIConversation.create({
-        data: {
-          userId: currentUser.userId,
-          messages: JSON.stringify(updatedMessages),
-        },
-      });
-    } catch (dbErr) {
-      // Ignore conversation history save error if table/schema constraint
+      return NextResponse.json({ reply: replyText, isOffline: true });
     }
 
-    return NextResponse.json({ reply: replyText, conversation: updatedMessages });
+    // 2. Live Gemini API execution via official @google/generative-ai SDK
+    try {
+      const genAI = new GoogleGenerativeAI(rawApiKey);
+      let model;
+      try {
+        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      } catch {
+        model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      }
+
+      const fullPrompt = `${systemPrompt}\n\nUser Question: ${message}`;
+      const result = await model.generateContent(fullPrompt);
+      const replyText = result.response.text();
+
+      // Save conversation to DB
+      const updatedMessages = [
+        ...conversationHistory,
+        { role: 'user', content: message, timestamp: new Date().toISOString() },
+        { role: 'assistant', content: replyText, timestamp: new Date().toISOString() },
+      ];
+
+      try {
+        await prisma.aIConversation.create({
+          data: {
+            userId: currentUser.userId,
+            messages: JSON.stringify(updatedMessages),
+          },
+        });
+      } catch (dbErr) {}
+
+      return NextResponse.json({ reply: replyText, conversation: updatedMessages });
+    } catch (apiError: any) {
+      // LOG REAL SERVER-SIDE ERROR FOR DIAGNOSTICS
+      console.error('[Gemini API Error]:', apiError?.message || apiError, apiError?.stack);
+
+      // SURFACE REAL VISIBLE ERROR STATE TO CLIENT (NO SILENT FAKE MASKING)
+      return NextResponse.json(
+        {
+          error: `Gemini API Call Failed: ${apiError?.message || 'Unable to connect to Google Generative Language API'}. Check server logs.`,
+        },
+        { status: 500 }
+      );
+    }
   } catch (error: any) {
+    console.error('[AI Assistant Route Exception]:', error);
     return NextResponse.json({ error: error.message || 'AI Assistant request failed' }, { status: 500 });
   }
 }

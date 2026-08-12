@@ -7,11 +7,12 @@ export interface AICallParams {
 
 export async function callAIProvider({ systemPrompt, userMessage }: AICallParams): Promise<string | null> {
   const groqKey = (process.env.GROQ_API_KEY || '').trim();
+  const grokKey = (process.env.GROK_API_KEY || '').trim();
   const geminiKey = (process.env.GEMINI_API_KEY || '').trim();
   const openAIKey = (process.env.OPENAI_API_KEY || '').trim();
 
-  // Determine active key
-  const activeKey = groqKey || geminiKey || openAIKey;
+  // Determine active key (prefer GROQ, then GROK/xAI, then GEMINI, then OpenAI)
+  const activeKey = groqKey || grokKey || geminiKey || openAIKey;
 
   if (!activeKey || activeKey === 'your-google-gemini-api-key-here' || activeKey === 'your-groq-api-key-here') {
     return null;
