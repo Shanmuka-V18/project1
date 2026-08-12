@@ -110,49 +110,53 @@ Instructions:
       return NextResponse.json({ reply: replyText, isOffline: true });
     }
 
-    // 2. Live Gemini API execution via official @google/generative-ai SDK
-    try {
-      const genAI = new GoogleGenerativeAI(rawApiKey);
-      let model;
+    // 2. Live Gemini API execution via official @google/generative-ai SDK with model fallback chain
+    const genAI = new GoogleGenerativeAI(rawApiKey);
+    const candidateModels = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp'];
+    let replyText = '';
+    let lastError: any = null;
+
+    const fullPrompt = `${systemPrompt}\n\nUser Question: ${message}`;
+
+    for (const modelName of candidateModels) {
       try {
-        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-      } catch {
-        model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent(fullPrompt);
+        replyText = result.response.text();
+        if (replyText) break;
+      } catch (modelErr: any) {
+        lastError = modelErr;
+        console.warn(`[Gemini Model ${modelName} call failed, trying next candidate]:`, modelErr?.message || modelErr);
       }
+    }
 
-      const fullPrompt = `${systemPrompt}\n\nUser Question: ${message}`;
-      const result = await model.generateContent(fullPrompt);
-      const replyText = result.response.text();
-
-      // Save conversation to DB
-      const updatedMessages = [
-        ...conversationHistory,
-        { role: 'user', content: message, timestamp: new Date().toISOString() },
-        { role: 'assistant', content: replyText, timestamp: new Date().toISOString() },
-      ];
-
-      try {
-        await prisma.aIConversation.create({
-          data: {
-            userId: currentUser.userId,
-            messages: JSON.stringify(updatedMessages),
-          },
-        });
-      } catch (dbErr) {}
-
-      return NextResponse.json({ reply: replyText, conversation: updatedMessages });
-    } catch (apiError: any) {
-      // LOG REAL SERVER-SIDE ERROR FOR DIAGNOSTICS
-      console.error('[Gemini API Error]:', apiError?.message || apiError, apiError?.stack);
-
-      // SURFACE REAL VISIBLE ERROR STATE TO CLIENT (NO SILENT FAKE MASKING)
+    if (!replyText) {
+      console.error('[All Gemini Models Failed]:', lastError?.message || lastError);
       return NextResponse.json(
         {
-          error: `Gemini API Call Failed: ${apiError?.message || 'Unable to connect to Google Generative Language API'}. Check server logs.`,
+          error: `Gemini API Call Failed: ${lastError?.message || 'Unable to connect to Google Generative Language API'}. Check server logs.`,
         },
         { status: 500 }
       );
     }
+
+    // Save conversation to DB
+    const updatedMessages = [
+      ...conversationHistory,
+      { role: 'user', content: message, timestamp: new Date().toISOString() },
+      { role: 'assistant', content: replyText, timestamp: new Date().toISOString() },
+    ];
+
+    try {
+      await prisma.aIConversation.create({
+        data: {
+          userId: currentUser.userId,
+          messages: JSON.stringify(updatedMessages),
+        },
+      });
+    } catch (dbErr) {}
+
+    return NextResponse.json({ reply: replyText, conversation: updatedMessages });
   } catch (error: any) {
     console.error('[AI Assistant Route Exception]:', error);
     return NextResponse.json({ error: error.message || 'AI Assistant request failed' }, { status: 500 });

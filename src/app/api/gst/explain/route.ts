@@ -22,12 +22,7 @@ export async function POST(request: Request) {
 
     try {
       const genAI = new GoogleGenerativeAI(rawApiKey);
-      let model;
-      try {
-        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-      } catch {
-        model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      }
+      const candidateModels = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp'];
 
       const prompt = `You are an expert Indian Chartered Accountant (CA) AI assistant. Explain the following GST calculation in clear, friendly, plain English for a non-accountant business owner:
 - Base Taxable Amount: ₹${amount}
@@ -41,8 +36,24 @@ export async function POST(request: Request) {
 
 Keep your explanation concise (max 3 bullet points or short paragraphs), clear, and professional.`;
 
-      const result = await model.generateContent(prompt);
-      const explanation = result.response.text();
+      let explanation = '';
+      let lastErr: any = null;
+
+      for (const modelName of candidateModels) {
+        try {
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const result = await model.generateContent(prompt);
+          explanation = result.response.text();
+          if (explanation) break;
+        } catch (mErr: any) {
+          lastErr = mErr;
+          console.warn(`[GST Explain Model ${modelName} failed]:`, mErr?.message || mErr);
+        }
+      }
+
+      if (!explanation) {
+        throw lastErr || new Error('All Gemini model candidates failed to respond.');
+      }
 
       return NextResponse.json({ explanation });
     } catch (apiError: any) {

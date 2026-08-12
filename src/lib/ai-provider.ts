@@ -104,17 +104,19 @@ export async function callAIProvider({ systemPrompt, userMessage }: AICallParams
   if (activeKey.startsWith('AIzaSy') || activeKey.startsWith('AQ.') || (!activeKey.startsWith('gsk_') && !activeKey.startsWith('xai-'))) {
     try {
       const genAI = new GoogleGenerativeAI(activeKey);
-      let model;
-      try {
-        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-      } catch {
-        model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      }
-
+      const candidateModels = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp'];
       const fullPrompt = `${systemPrompt}\n\nUser Question: ${userMessage}`;
-      const result = await model.generateContent(fullPrompt);
-      const text = result.response.text();
-      if (text) return text.trim();
+
+      for (const modelName of candidateModels) {
+        try {
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const result = await model.generateContent(fullPrompt);
+          const text = result.response.text();
+          if (text) return text.trim();
+        } catch (mErr: any) {
+          console.warn(`[Gemini Model ${modelName} failed in provider]:`, mErr?.message || mErr);
+        }
+      }
     } catch (err: any) {
       console.warn('[Google Gemini API Error]:', err?.message || err);
     }
