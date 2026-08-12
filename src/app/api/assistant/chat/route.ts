@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { calculateFinancialHealthScore } from '@/lib/utils';
+import { callAIProvider } from '@/lib/ai-provider';
 
 export async function POST(request: Request) {
   const currentUser = await getCurrentUser();
@@ -88,7 +88,7 @@ Instructions:
 4. Format your responses with markdown bolding, lists, and clear money formatting in INR (₹).
 5. Be concise, professional, supportive, and actionable.`;
 
-    // Smart contextual response generator function
+    // Smart contextual response generator function if no live key is present
     const generateSmartFallback = (query: string): string => {
       const lowerMsg = query.toLowerCase();
 
@@ -119,30 +119,10 @@ Instructions:
       return `Here is your current financial snapshot for this month (${now.toLocaleString('en-IN', { month: 'long', year: 'numeric' })}):\n- **Total Income:** ₹${totalIncome.toLocaleString('en-IN')}\n- **Total Expenses:** ₹${totalExpense.toLocaleString('en-IN')}\n- **Net Savings / Profit:** ₹${netProfit.toLocaleString('en-IN')}\n- **Financial Health Score:** ${health.score}/100 (${health.rating})\n\nHow else can I assist you with your taxes, budgets, or invoice planning today?`;
     };
 
-    const rawApiKey = (process.env.GEMINI_API_KEY || '').trim();
-    let replyText = '';
+    // Call Multi-Provider AI (Groq, xAI Grok, or Google Gemini)
+    const aiReply = await callAIProvider({ systemPrompt, userMessage: message });
 
-    // Check if key is valid Google Gemini key (starts with AIzaSy)
-    if (!rawApiKey || rawApiKey === 'your-google-gemini-api-key-here' || !rawApiKey.startsWith('AIzaSy')) {
-      replyText = generateSmartFallback(message);
-    } else {
-      try {
-        const genAI = new GoogleGenerativeAI(rawApiKey);
-        let model;
-        try {
-          model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-        } catch {
-          model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        }
-
-        const fullPrompt = `${systemPrompt}\n\nUser Question: ${message}`;
-        const result = await model.generateContent(fullPrompt);
-        replyText = result.response.text();
-      } catch (geminiErr: any) {
-        console.warn('[Gemini API Call Exception, falling back to Context Engine]:', geminiErr?.message || geminiErr);
-        replyText = generateSmartFallback(message);
-      }
-    }
+    const replyText = aiReply || generateSmartFallback(message);
 
     // Save conversation to DB
     const updatedMessages = [

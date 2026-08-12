@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { callAIProvider } from '@/lib/ai-provider';
 
 export async function POST(request: Request) {
   const currentUser = await getCurrentUser();
@@ -22,22 +22,9 @@ export async function POST(request: Request) {
         : `This is an Inter-State transaction (between two states) for ₹${amount.toLocaleString('en-IN')} at ${gstRate}% GST. The entire tax is collected as Integrated GST (IGST = ₹${igst.toLocaleString('en-IN')}). Final gross total payable is ₹${finalAmount.toLocaleString('en-IN')}.`;
     };
 
-    const rawApiKey = (process.env.GEMINI_API_KEY || '').trim();
+    const systemPrompt = `You are an expert Indian Chartered Accountant (CA) AI assistant. Explain GST calculations in clear, friendly, plain English for a non-accountant business owner. Keep explanations concise (max 3-4 bullet points or short paragraphs).`;
 
-    if (!rawApiKey || rawApiKey === 'your-google-gemini-api-key-here' || !rawApiKey.startsWith('AIzaSy')) {
-      return NextResponse.json({ explanation: getFallbackExplanation() });
-    }
-
-    try {
-      const genAI = new GoogleGenerativeAI(rawApiKey);
-      let model;
-      try {
-        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-      } catch {
-        model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      }
-
-      const prompt = `You are an expert Indian Chartered Accountant (CA) AI assistant. Explain the following GST calculation in clear, friendly, plain English for a non-accountant business owner:
+    const userPrompt = `Explain this GST calculation:
 - Base Taxable Amount: ₹${amount}
 - GST Rate: ${gstRate}%
 - Transaction Type: ${transactionType}
@@ -45,18 +32,11 @@ export async function POST(request: Request) {
 - CGST: ₹${cgst}
 - SGST: ₹${sgst}
 - IGST: ₹${igst}
-- Final Amount: ₹${finalAmount}
+- Final Amount: ₹${finalAmount}`;
 
-Keep your explanation concise (max 4 bullet points or short paragraphs), clear, and professional.`;
+    const aiReply = await callAIProvider({ systemPrompt, userMessage: userPrompt });
 
-      const result = await model.generateContent(prompt);
-      const explanation = result.response.text();
-
-      return NextResponse.json({ explanation });
-    } catch (geminiErr: any) {
-      console.warn('[GST Explain Gemini Exception]:', geminiErr?.message || geminiErr);
-      return NextResponse.json({ explanation: getFallbackExplanation() });
-    }
+    return NextResponse.json({ explanation: aiReply || getFallbackExplanation() });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to explain GST calculation' }, { status: 500 });
   }
