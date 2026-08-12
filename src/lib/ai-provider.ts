@@ -100,8 +100,8 @@ export async function callAIProvider({ systemPrompt, userMessage }: AICallParams
     }
   }
 
-  // 3. Google Gemini Key (starts with AIzaSy)
-  if (activeKey.startsWith('AIzaSy')) {
+  // 3. Google Gemini Key (starts with AIzaSy or AQ. or any non-Groq/xAI key)
+  if (activeKey.startsWith('AIzaSy') || activeKey.startsWith('AQ.') || (!activeKey.startsWith('gsk_') && !activeKey.startsWith('xai-'))) {
     try {
       const genAI = new GoogleGenerativeAI(activeKey);
       let model;
