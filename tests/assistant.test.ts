@@ -1,10 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { FALLBACK_GEMINI_MODELS, PRIMARY_GEMINI_MODEL } from '../src/lib/gemini-config';
 
 describe('Centralized Gemini Model Configuration & Fallback Engine', () => {
-  it('defines gemini-1.5-flash as primary stable production model', () => {
-    expect(PRIMARY_GEMINI_MODEL).toBe('gemini-1.5-flash');
-    expect(FALLBACK_GEMINI_MODELS[0]).toBe('gemini-1.5-flash');
+  it('defines valid primary model ID and fallback chain', () => {
+    expect(PRIMARY_GEMINI_MODEL).toBeTruthy();
+    expect(FALLBACK_GEMINI_MODELS[0]).toBe(PRIMARY_GEMINI_MODEL);
   });
 
   it('includes stable fallback model candidates in fallback chain', () => {

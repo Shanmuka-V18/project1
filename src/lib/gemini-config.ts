@@ -1,10 +1,12 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-export const PRIMARY_GEMINI_MODEL = 'gemini-1.5-flash';
+export const PRIMARY_GEMINI_MODEL = 'gemini-2.5-flash';
 export const FALLBACK_GEMINI_MODELS = [
+  'gemini-2.5-flash',
   'gemini-1.5-flash',
   'gemini-1.5-pro',
-  'gemini-1.0-pro',
+  'gemini-2.0-flash-exp',
+  'gemini-3.1-flash-lite',
 ];
 
 export interface GeminiRequestOptions {
@@ -29,13 +31,20 @@ export async function generateGeminiContent({ prompt, systemInstruction }: Gemin
     try {
       const model = genAI.getGenerativeModel({ model: modelName });
       const result = await model.generateContent(fullPrompt);
-      replyText = result.response.text();
-      if (replyText) {
+
+      // Safe extraction supporting multiple response shapes
+      if (typeof result.response?.text === 'function') {
+        replyText = result.response.text();
+      } else if ((result.response as any)?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        replyText = (result.response as any).candidates[0].content.parts[0].text;
+      }
+
+      if (replyText && replyText.trim().length > 0) {
         return replyText.trim();
       }
     } catch (err: any) {
       lastError = err;
-      console.warn(`[Gemini Model Service] Model '${modelName}' call failed, attempting fallback:`, err?.message || err);
+      console.warn(`[Gemini Model Service] Model '${modelName}' call failed, trying next candidate:`, err?.message || err);
     }
   }
 

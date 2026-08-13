@@ -91,7 +91,7 @@ function parseFormattedInline(text: string): React.ReactNode {
 }
 
 export default function AIAssistantPage() {
-  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; isError?: boolean }>>([
+  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; isError?: boolean; isOffline?: boolean }>>([
     {
       role: 'assistant',
       content:
@@ -134,7 +134,7 @@ export default function AIAssistantPage() {
 
       const data = await response.json();
       if (data.reply) {
-        setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
+        setMessages((prev) => [...prev, { role: 'assistant', content: data.reply, isOffline: data.isOffline }]);
       } else if (data.error) {
         // Surface REAL visible error state to the client
         setMessages((prev) => [
@@ -144,7 +144,7 @@ export default function AIAssistantPage() {
       } else {
         setMessages((prev) => [
           ...prev,
-          { role: 'assistant', content: 'AI Assistant is temporarily unavailable. Please try again.', isError: true },
+          { role: 'assistant', content: "I'm having trouble connecting right now — please try again in a moment.", isError: true },
         ]);
       }
     } catch (error: any) {
@@ -194,6 +194,13 @@ export default function AIAssistantPage() {
                     : 'bg-slate-100 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700/60 rounded-tl-none'
                 )}
               >
+                {msg.isOffline && (
+                  <div className="mb-2">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                      Offline Demo Mode
+                    </span>
+                  </div>
+                )}
                 {msg.role === 'assistant' && !msg.isError ? (
                   <MarkdownRenderer content={msg.content} />
                 ) : (
