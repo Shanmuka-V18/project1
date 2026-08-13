@@ -14,9 +14,9 @@
 }
 
 .dark {
-  --background: #0f172a;
+  --background: #050816;
   --foreground: #f8fafc;
-  --card: #1e293b;
+  --card: #0f172a;
   --card-foreground: #f8fafc;
   --card-border: rgba(255, 255, 255, 0.08);
   --primary: #14b8a6;
@@ -67,7 +67,7 @@ body {
 }
 
 .dark .glass-panel {
-  background: rgba(30, 41, 59, 0.7);
+  background: rgba(15, 23, 42, 0.75);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--card-border);
@@ -81,7 +81,7 @@ body {
 }
 
 .dark .glass-card {
-  background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(5, 8, 22, 0.95) 100%);
   backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
@@ -104,60 +104,117 @@ body {
 }
 
 /* ==========================================================================
-   LOGIN PAGE PREMIUM ANIMATIONS & VISUAL STYLING
+   AI FINTECH AURORA FLOW BACKGROUND & ANIMATIONS (LOGIN EXCLUSIVE)
    ========================================================================== */
 
-/* Subtle financial grid pattern */
-.login-grid-bg {
-  background-image: radial-gradient(rgba(13, 148, 136, 0.12) 1px, transparent 1px);
-  background-size: 28px 28px;
+/* Dark Premium Deep Navy Base */
+.aurora-bg-dark {
+  background: radial-gradient(circle at 50% 50%, #080d24 0%, #020617 100%);
 }
 
-.dark .login-grid-bg {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
-  background-size: 28px 28px;
+.aurora-bg-light {
+  background: radial-gradient(circle at 50% 50%, #f1f5f9 0%, #f8fafc 100%);
 }
 
-/* Ambient Moving Gradient Orbs */
-@keyframes loginOrb1 {
+/* Slow Atmospheric Aurora Motion Keyframes (28s - 42s) */
+@keyframes auroraFloat1 {
   0%, 100% {
-    transform: translate(0px, 0px) scale(1);
+    transform: translate(0%, 0%) scale(1);
+    opacity: 0.28;
+  }
+  33% {
+    transform: translate(25%, -20%) scale(1.15);
+    opacity: 0.35;
+  }
+  66% {
+    transform: translate(-15%, 15%) scale(0.95);
+    opacity: 0.22;
+  }
+}
+
+@keyframes auroraFloat2 {
+  0%, 100% {
+    transform: translate(0%, 0%) scale(1);
+    opacity: 0.25;
+  }
+  33% {
+    transform: translate(-30%, 25%) scale(1.2);
+    opacity: 0.38;
+  }
+  66% {
+    transform: translate(20%, -15%) scale(0.9);
+    opacity: 0.20;
+  }
+}
+
+@keyframes auroraFloat3 {
+  0%, 100% {
+    transform: translate(0%, 0%) scale(1);
+    opacity: 0.22;
   }
   50% {
-    transform: translate(30px, -25px) scale(1.08);
+    transform: translate(-20%, -25%) scale(1.25);
+    opacity: 0.35;
   }
 }
 
-@keyframes loginOrb2 {
+@keyframes auroraFloat4 {
   0%, 100% {
-    transform: translate(0px, 0px) scale(1);
+    transform: translate(0%, 0%) scale(1);
+    opacity: 0.20;
   }
   50% {
-    transform: translate(-35px, 20px) scale(1.05);
+    transform: translate(35%, 18%) scale(1.1);
+    opacity: 0.32;
   }
 }
 
-@keyframes loginParticle {
+/* Flowing Light Ribbon Wave Animation */
+@keyframes ribbonWave {
   0%, 100% {
-    transform: translateY(0px) scale(1);
-    opacity: 0.3;
+    transform: translateY(0px) rotate(0deg) scale(1);
+    opacity: 0.12;
   }
   50% {
-    transform: translateY(-12px) scale(1.2);
-    opacity: 0.7;
+    transform: translateY(-20px) rotate(3deg) scale(1.05);
+    opacity: 0.18;
   }
 }
 
-.animate-login-orb-1 {
-  animation: loginOrb1 12s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+/* Soft Floating Particles */
+@keyframes particleFloat {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translateY(-24px) translateX(12px);
+    opacity: 0.65;
+  }
 }
 
-.animate-login-orb-2 {
-  animation: loginOrb2 16s cubic-bezier(0.4, 0, 0.2, 1) 2s infinite;
+.animate-aurora-1 {
+  animation: auroraFloat1 32s ease-in-out infinite;
 }
 
-.animate-login-particle {
-  animation: loginParticle 6s ease-in-out infinite;
+.animate-aurora-2 {
+  animation: auroraFloat2 38s ease-in-out 2s infinite;
+}
+
+.animate-aurora-3 {
+  animation: auroraFloat3 28s ease-in-out 4s infinite;
+}
+
+.animate-aurora-4 {
+  animation: auroraFloat4 42s ease-in-out 1s infinite;
+}
+
+.animate-ribbon-wave {
+  animation: ribbonWave 20s ease-in-out infinite;
+}
+
+.animate-particle-soft {
+  animation: particleFloat 7s ease-in-out infinite;
 }
 
 /* Staggered entrance animation keyframe */
@@ -179,9 +236,12 @@ body {
 
 /* Accessibility: Prefers-Reduced-Motion Override */
 @media (prefers-reduced-motion: reduce) {
-  .animate-login-orb-1,
-  .animate-login-orb-2,
-  .animate-login-particle {
+  .animate-aurora-1,
+  .animate-aurora-2,
+  .animate-aurora-3,
+  .animate-aurora-4,
+  .animate-ribbon-wave,
+  .animate-particle-soft {
     animation: none !important;
   }
   .login-entrance-item {
