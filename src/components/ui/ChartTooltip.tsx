@@ -24,7 +24,7 @@ export function CustomChartTooltip({
           {payload.map((entry: any, index: number) => {
             const name = entry.name || entry.dataKey || 'Value';
             const value = entry.value;
-            const color = entry.color || entry.fill || '#14b8a6';
+            const color = entry.color || entry.fill || entry.payload?.fill || entry.payload?.color || '#14b8a6';
 
             return (
               <div key={`item-${index}`} className="flex items-center justify-between space-x-4">

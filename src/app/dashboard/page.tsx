@@ -98,6 +98,11 @@ export default function DashboardPage() {
 
   const { summary, trendData = [], categoryBreakdown = [], recentTransactions = [], aiInsight } = data || {};
 
+  const formattedCategoryBreakdown = categoryBreakdown.map((item: any, index: number) => ({
+    ...item,
+    fill: COLORS[index % COLORS.length],
+  }));
+
   return (
     <div className="relative space-y-8 animate-in fade-in duration-300">
 
@@ -265,7 +270,7 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="h-72">
-            {categoryBreakdown.length === 0 ? (
+            {formattedCategoryBreakdown.length === 0 ? (
               <div className="flex h-full items-center justify-center text-xs text-slate-500 dark:text-slate-400 font-medium">
                 No expense entries for this month
               </div>
@@ -286,7 +291,7 @@ export default function DashboardPage() {
                     className="fill-slate-900 dark:fill-slate-100"
                   />
                   <Pie
-                    data={categoryBreakdown}
+                    data={formattedCategoryBreakdown}
                     cx="50%"
                     cy="50%"
                     innerRadius={55}
@@ -297,8 +302,8 @@ export default function DashboardPage() {
                     animationDuration={900}
                     animationEasing="ease-out"
                   >
-                    {categoryBreakdown.map((entry: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    {formattedCategoryBreakdown.map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Pie>
                   <Tooltip content={<CustomChartTooltip />} />
