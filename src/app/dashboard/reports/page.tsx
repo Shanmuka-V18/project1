@@ -34,13 +34,19 @@ export default function ReportsPage() {
     return <div className="py-20 text-center text-xs text-slate-500 dark:text-slate-400 font-medium">Generating Profit & Loss Report...</div>;
   }
 
-  const { currentMonth = {}, comparison = {}, breakdown = {} } = pnlData || {};
+  const {
+    periodLabel = 'Current Month',
+    comparisonLabel = 'vs Previous Month',
+    hasPrevData = false,
+    currentMonth = {},
+    comparison = {},
+    breakdown = {},
+  } = pnlData || {};
+
   const revenue = currentMonth.revenue || 0;
   const expenses = currentMonth.expenses || 0;
   const netIncome = currentMonth.netIncome || 0;
   const profitMargin = currentMonth.profitMargin || 0;
-
-  const hasPrevData = comparison.prevRevenue > 0 || comparison.prevExpense > 0;
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto animate-in fade-in duration-300">
@@ -106,18 +112,20 @@ export default function ReportsPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Revenue Card */}
         <Card className="border-l-4 border-l-emerald-500">
-          <StatLabel>Gross Operating Revenue</StatLabel>
+          <StatLabel>{periodLabel} Revenue</StatLabel>
           <h3 className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400 mt-2">{formatCurrency(revenue)}</h3>
           <div className="mt-2 flex items-center text-xs font-semibold">
-            {!hasPrevData ? (
-              <span className="text-slate-500 dark:text-slate-400">Baseline period (No prior data)</span>
+            {period === 'all-time' ? (
+              <span className="text-slate-500 dark:text-slate-400">Total cumulative revenue</span>
+            ) : !hasPrevData ? (
+              <span className="text-slate-500 dark:text-slate-400">Baseline period (No prior data {comparisonLabel})</span>
             ) : comparison.revenueGrowth >= 0 ? (
               <span className="flex items-center text-emerald-700 dark:text-emerald-400">
-                <ArrowUpRight className="h-4 w-4 mr-0.5" /> +{comparison.revenueGrowth}% MoM Growth
+                <ArrowUpRight className="h-4 w-4 mr-0.5" /> +{comparison.revenueGrowth}% {comparisonLabel}
               </span>
             ) : (
               <span className="flex items-center text-rose-700 dark:text-rose-400">
-                <ArrowDownRight className="h-4 w-4 mr-0.5" /> {comparison.revenueGrowth}% MoM Decline
+                <ArrowDownRight className="h-4 w-4 mr-0.5" /> {comparison.revenueGrowth}% {comparisonLabel}
               </span>
             )}
           </div>
@@ -125,18 +133,20 @@ export default function ReportsPage() {
 
         {/* Operating Expenses Card */}
         <Card className="border-l-4 border-l-rose-500">
-          <StatLabel>Total Operating Expenses</StatLabel>
+          <StatLabel>{periodLabel} Expenses</StatLabel>
           <h3 className="text-2xl font-extrabold text-rose-700 dark:text-rose-400 mt-2">{formatCurrency(expenses)}</h3>
           <div className="mt-2 flex items-center text-xs font-semibold">
-            {!hasPrevData ? (
-              <span className="text-slate-500 dark:text-slate-400">Baseline period (No prior data)</span>
+            {period === 'all-time' ? (
+              <span className="text-slate-500 dark:text-slate-400">Total cumulative expenses</span>
+            ) : !hasPrevData ? (
+              <span className="text-slate-500 dark:text-slate-400">Baseline period (No prior data {comparisonLabel})</span>
             ) : comparison.expenseGrowth <= 0 ? (
               <span className="flex items-center text-emerald-700 dark:text-emerald-400">
-                <ArrowDownRight className="h-4 w-4 mr-0.5" /> {comparison.expenseGrowth}% Reduced Outflow
+                <ArrowDownRight className="h-4 w-4 mr-0.5" /> {comparison.expenseGrowth}% Reduced Outflow ({comparisonLabel})
               </span>
             ) : (
               <span className="flex items-center text-rose-700 dark:text-rose-400">
-                <ArrowUpRight className="h-4 w-4 mr-0.5" /> +{comparison.expenseGrowth}% Increased Expense
+                <ArrowUpRight className="h-4 w-4 mr-0.5" /> +{comparison.expenseGrowth}% Increased Expense ({comparisonLabel})
               </span>
             )}
           </div>
@@ -144,7 +154,7 @@ export default function ReportsPage() {
 
         {/* Net Profit Card */}
         <Card className="border-l-4 border-l-teal-500">
-          <StatLabel>Net Profit / Margin</StatLabel>
+          <StatLabel>{periodLabel} Net Profit</StatLabel>
           <h3 className={`text-2xl font-extrabold mt-2 ${netIncome >= 0 ? 'text-teal-700 dark:text-teal-300' : 'text-rose-700 dark:text-rose-400'}`}>
             {formatCurrency(netIncome)}
           </h3>
@@ -158,7 +168,7 @@ export default function ReportsPage() {
 
       {/* P&L Statement Details Table */}
       <Card className="p-6">
-        <SectionTitle className="mb-4 text-teal-700 dark:text-teal-400">Monthly P&L Income Statement</SectionTitle>
+        <SectionTitle className="mb-4 text-teal-700 dark:text-teal-400">{periodLabel} P&L Income Statement</SectionTitle>
 
         <div className="space-y-4 text-xs">
           {/* Revenue Section */}

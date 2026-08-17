@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { calculatePnLData } from '@/lib/pnl-utils';
+import { calculatePnLData, getPeriodDateRanges } from '@/lib/pnl-utils';
 
 export async function GET(request: Request) {
   const currentUser = await getCurrentUser();
@@ -12,80 +12,35 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const period = searchParams.get('period') || 'this-month';
 
-  const now = new Date();
-  let startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-  let endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-
-  let prevStartDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  let prevEndDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-
-  if (period === 'last-month') {
-    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-
-    prevStartDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-    prevEndDate = new Date(now.getFullYear(), now.getMonth() - 1, 0, 23, 59, 59);
-  } else if (period === 'year') {
-    startDate = new Date(now.getFullYear(), 0, 1);
-    endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
-
-    prevStartDate = new Date(now.getFullYear() - 1, 0, 1);
-    prevEndDate = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59);
-  } else if (period === 'all-time') {
-    startDate = new Date(2000, 0, 1);
-    endDate = new Date(now.getFullYear() + 10, 11, 31, 23, 59, 59);
-    prevStartDate = new Date(2000, 0, 1);
-    prevEndDate = new Date(2000, 0, 1);
-  }
+  const { startDate, endDate, prevStartDate, prevEndDate, periodLabel, comparisonLabel } = getPeriodDateRanges(period);
 
   // Current Period Data
-  let incomes = await prisma.income.findMany({
+  const incomes = await prisma.income.findMany({
     where: { userId: currentUser.userId, date: { gte: startDate, lte: endDate } },
   });
 
-  let expenses = await prisma.expense.findMany({
+  const expenses = await prisma.expense.findMany({
     where: { userId: currentUser.userId, date: { gte: startDate, lte: endDate } },
   });
-
-  // If period === 'this-month' and current month has zero entries, check if user has records in last 30 days / all time
-  if (period === 'this-month' && incomes.length === 0 && expenses.length === 0) {
-    const latestIncome = await prisma.income.findFirst({
-      where: { userId: currentUser.userId },
-      orderBy: { date: 'desc' },
-    });
-    const latestExpense = await prisma.expense.findFirst({
-      where: { userId: currentUser.userId },
-      orderBy: { date: 'desc' },
-    });
-
-    if (latestIncome || latestExpense) {
-      const refDate = latestIncome?.date || latestExpense?.date || now;
-      startDate = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
-      endDate = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0, 23, 59, 59);
-
-      prevStartDate = new Date(refDate.getFullYear(), refDate.getMonth() - 1, 1);
-      prevEndDate = new Date(refDate.getFullYear(), refDate.getMonth(), 0, 23, 59, 59);
-
-      incomes = await prisma.income.findMany({
-        where: { userId: currentUser.userId, date: { gte: startDate, lte: endDate } },
-      });
-
-      expenses = await prisma.expense.findMany({
-        where: { userId: currentUser.userId, date: { gte: startDate, lte: endDate } },
-      });
-    }
-  }
 
   // Previous Period Data
-  const prevIncomes = await prisma.income.findMany({
-    where: { userId: currentUser.userId, date: { gte: prevStartDate, lte: prevEndDate } },
-  });
+  let prevIncomes: any[] = [];
+  let prevExpenses: any[] = [];
 
-  const prevExpenses = await prisma.expense.findMany({
-    where: { userId: currentUser.userId, date: { gte: prevStartDate, lte: prevEndDate } },
-  });
+  if (prevStartDate && prevEndDate) {
+    prevIncomes = await prisma.income.findMany({
+      where: { userId: currentUser.userId, date: { gte: prevStartDate, lte: prevEndDate } },
+    });
 
-  const result = calculatePnLData(incomes, expenses, prevIncomes, prevExpenses);
+    prevExpenses = await prisma.expense.findMany({
+      where: { userId: currentUser.userId, date: { gte: prevStartDate, lte: prevEndDate } },
+    });
+  }
+
+  const result = calculatePnLData(incomes, expenses, prevIncomes, prevExpenses, {
+    periodLabel,
+    comparisonLabel,
+  });
 
   return NextResponse.json({
     period,

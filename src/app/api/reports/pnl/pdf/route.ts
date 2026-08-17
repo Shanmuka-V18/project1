@@ -3,7 +3,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { calculatePnLData } from '@/lib/pnl-utils';
+import { calculatePnLData, getPeriodDateRanges } from '@/lib/pnl-utils';
 
 export async function GET(request: Request) {
   const currentUser = await getCurrentUser();
@@ -14,75 +14,33 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const period = searchParams.get('period') || 'this-month';
 
-  const now = new Date();
-  let startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-  let endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  const { startDate, endDate, prevStartDate, prevEndDate, periodLabel, comparisonLabel } = getPeriodDateRanges(period);
 
-  let prevStartDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  let prevEndDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-
-  if (period === 'last-month') {
-    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-    prevStartDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-    prevEndDate = new Date(now.getFullYear(), now.getMonth() - 1, 0, 23, 59, 59);
-  } else if (period === 'year') {
-    startDate = new Date(now.getFullYear(), 0, 1);
-    endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
-    prevStartDate = new Date(now.getFullYear() - 1, 0, 1);
-    prevEndDate = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59);
-  } else if (period === 'all-time') {
-    startDate = new Date(2000, 0, 1);
-    endDate = new Date(now.getFullYear() + 10, 11, 31, 23, 59, 59);
-    prevStartDate = new Date(2000, 0, 1);
-    prevEndDate = new Date(2000, 0, 1);
-  }
-
-  let incomes = await prisma.income.findMany({
+  const incomes = await prisma.income.findMany({
     where: { userId: currentUser.userId, date: { gte: startDate, lte: endDate } },
   });
 
-  let expenses = await prisma.expense.findMany({
+  const expenses = await prisma.expense.findMany({
     where: { userId: currentUser.userId, date: { gte: startDate, lte: endDate } },
   });
 
-  if (period === 'this-month' && incomes.length === 0 && expenses.length === 0) {
-    const latestIncome = await prisma.income.findFirst({
-      where: { userId: currentUser.userId },
-      orderBy: { date: 'desc' },
-    });
-    const latestExpense = await prisma.expense.findFirst({
-      where: { userId: currentUser.userId },
-      orderBy: { date: 'desc' },
+  let prevIncomes: any[] = [];
+  let prevExpenses: any[] = [];
+
+  if (prevStartDate && prevEndDate) {
+    prevIncomes = await prisma.income.findMany({
+      where: { userId: currentUser.userId, date: { gte: prevStartDate, lte: prevEndDate } },
     });
 
-    if (latestIncome || latestExpense) {
-      const refDate = latestIncome?.date || latestExpense?.date || now;
-      startDate = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
-      endDate = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0, 23, 59, 59);
-
-      prevStartDate = new Date(refDate.getFullYear(), refDate.getMonth() - 1, 1);
-      prevEndDate = new Date(refDate.getFullYear(), refDate.getMonth(), 0, 23, 59, 59);
-
-      incomes = await prisma.income.findMany({
-        where: { userId: currentUser.userId, date: { gte: startDate, lte: endDate } },
-      });
-
-      expenses = await prisma.expense.findMany({
-        where: { userId: currentUser.userId, date: { gte: startDate, lte: endDate } },
-      });
-    }
+    prevExpenses = await prisma.expense.findMany({
+      where: { userId: currentUser.userId, date: { gte: prevStartDate, lte: prevEndDate } },
+    });
   }
 
-  const prevIncomes = await prisma.income.findMany({
-    where: { userId: currentUser.userId, date: { gte: prevStartDate, lte: prevEndDate } },
+  const result = calculatePnLData(incomes, expenses, prevIncomes, prevExpenses, {
+    periodLabel,
+    comparisonLabel,
   });
-
-  const prevExpenses = await prisma.expense.findMany({
-    where: { userId: currentUser.userId, date: { gte: prevStartDate, lte: prevEndDate } },
-  });
-
-  const result = calculatePnLData(incomes, expenses, prevIncomes, prevExpenses);
 
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([600, 800]);
@@ -98,7 +56,7 @@ export async function GET(request: Request) {
   // Header Title
   page.drawText('PROFIT & LOSS STATEMENT', { x: 40, y, size: 18, font: fontBold, color: primaryColor });
   y -= 20;
-  page.drawText(`Period: ${period.toUpperCase()} (${formatDate(startDate)} to ${formatDate(endDate)})`, {
+  page.drawText(`Period: ${periodLabel.toUpperCase()} (${formatDate(startDate)} to ${formatDate(endDate)})`, {
     x: 40,
     y,
     size: 10,
@@ -128,22 +86,34 @@ export async function GET(request: Request) {
   page.drawText('REVENUE BREAKDOWN', { x: 40, y, size: 12, font: fontBold, color: darkColor });
   y -= 18;
 
-  Object.entries(result.breakdown.incomeCategories).forEach(([cat, val]) => {
-    page.drawText(cat, { x: 50, y, size: 10, font, color: darkColor });
-    page.drawText(formatCurrency(val), { x: 480, y, size: 10, font, color: darkColor });
+  const incomeCats = Object.entries(result.breakdown.incomeCategories);
+  if (incomeCats.length === 0) {
+    page.drawText('No revenue entries for this period', { x: 50, y, size: 10, font, color: grayColor });
     y -= 18;
-  });
+  } else {
+    incomeCats.forEach(([cat, val]) => {
+      page.drawText(cat, { x: 50, y, size: 10, font, color: darkColor });
+      page.drawText(formatCurrency(val), { x: 480, y, size: 10, font, color: darkColor });
+      y -= 18;
+    });
+  }
 
   y -= 15;
   // Expense Breakdown Table
   page.drawText('EXPENSE BREAKDOWN', { x: 40, y, size: 12, font: fontBold, color: darkColor });
   y -= 18;
 
-  Object.entries(result.breakdown.expenseCategories).forEach(([cat, val]) => {
-    page.drawText(cat, { x: 50, y, size: 10, font, color: darkColor });
-    page.drawText(`-${formatCurrency(val)}`, { x: 480, y, size: 10, font, color: darkColor });
+  const expenseCats = Object.entries(result.breakdown.expenseCategories);
+  if (expenseCats.length === 0) {
+    page.drawText('No expense entries for this period', { x: 50, y, size: 10, font, color: grayColor });
     y -= 18;
-  });
+  } else {
+    expenseCats.forEach(([cat, val]) => {
+      page.drawText(cat, { x: 50, y, size: 10, font, color: darkColor });
+      page.drawText(`-${formatCurrency(val)}`, { x: 480, y, size: 10, font, color: darkColor });
+      y -= 18;
+    });
+  }
 
   const pdfBytes = await pdfDoc.save();
 
