@@ -34,7 +34,7 @@ export interface PnLCalculationResult {
   expenseByCategory: CategoryAmount[];
 }
 
-export type ReportingPeriod = 'this-month' | 'last-month' | 'year' | 'all-time';
+export type ReportingPeriod = 'this-month' | 'last-month' | 'year' | 'all-time' | 'custom';
 
 export interface DateRange {
   startDate: Date;
@@ -45,11 +45,24 @@ export interface DateRange {
   comparisonLabel: string;
 }
 
+function parseLocalDate(dateStr: string, isEnd = false): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (isEnd) {
+    return new Date(y, m - 1, d, 23, 59, 59, 999);
+  }
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
+}
+
 /**
  * Calculates start and end dates for current and comparison periods.
- * Handles month/year boundaries and year roll-over (e.g. Jan -> Dec prior year).
+ * Handles month/year boundaries, year roll-over, and custom date ranges.
  */
-export function getPeriodDateRanges(periodStr: string, refDate: Date = new Date()): DateRange {
+export function getPeriodDateRanges(
+  periodStr: string,
+  refDate: Date = new Date(),
+  customFrom?: string | null,
+  customTo?: string | null
+): DateRange {
   const period = (periodStr || 'this-month') as ReportingPeriod;
   const year = refDate.getFullYear();
   const month = refDate.getMonth(); // 0-indexed (0 = Jan, 11 = Dec)
@@ -61,7 +74,17 @@ export function getPeriodDateRanges(periodStr: string, refDate: Date = new Date(
   let periodLabel = 'Current Month';
   let comparisonLabel = 'vs Previous Month';
 
-  if (period === 'last-month') {
+  if (period === 'custom' && customFrom && customTo) {
+    startDate = parseLocalDate(customFrom, false);
+    endDate = parseLocalDate(customTo, true);
+
+    periodLabel = `Custom Range (${customFrom} to ${customTo})`;
+    comparisonLabel = 'vs Prior Period';
+
+    const durationMs = endDate.getTime() - startDate.getTime();
+    prevEndDate = new Date(startDate.getTime() - 1);
+    prevStartDate = new Date(prevEndDate.getTime() - durationMs);
+  } else if (period === 'last-month') {
     periodLabel = 'Previous Month';
     comparisonLabel = 'vs Prior Month';
     // 1st day of previous month

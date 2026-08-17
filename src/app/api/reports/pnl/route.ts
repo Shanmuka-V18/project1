@@ -11,8 +11,10 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const period = searchParams.get('period') || 'this-month';
+  const from = searchParams.get('from');
+  const to = searchParams.get('to');
 
-  const { startDate, endDate, prevStartDate, prevEndDate, periodLabel, comparisonLabel } = getPeriodDateRanges(period);
+  const { startDate, endDate, prevStartDate, prevEndDate, periodLabel, comparisonLabel } = getPeriodDateRanges(period, new Date(), from, to);
 
   // Current Period Data
   const incomes = await prisma.income.findMany({

@@ -66,6 +66,18 @@ describe('P&L Reports Calculation Engine', () => {
       expect(range.prevStartDate).toBeNull();
       expect(range.prevEndDate).toBeNull();
     });
+
+    it('calculates Custom Range date boundaries and equal-length preceding comparison period', () => {
+      const refDate = new Date(2026, 7, 15);
+      const range = getPeriodDateRanges('custom', refDate, '2026-06-01', '2026-08-31');
+
+      expect(range.periodLabel).toBe('Custom Range (2026-06-01 to 2026-08-31)');
+      expect(range.comparisonLabel).toBe('vs Prior Period');
+      expect(range.startDate).toEqual(new Date(2026, 5, 1, 0, 0, 0, 0));
+      expect(range.endDate).toEqual(new Date(2026, 7, 31, 23, 59, 59, 999));
+      expect(range.prevEndDate).toBeDefined();
+      expect(range.prevStartDate).toBeDefined();
+    });
   });
 
   describe('Multi-Period Data Filtering & Aggregation', () => {
@@ -138,6 +150,29 @@ describe('P&L Reports Calculation Engine', () => {
       // Comparison period (Jun): Revenue 60k, Expenses 15k
       expect(result.comparison.prevRevenue).toBe(60000);
       expect(result.comparison.prevExpense).toBe(15000);
+    });
+
+    it('filters Custom Range (Jan 1 to Dec 31, 2026) correctly including exact boundary dates', () => {
+      const { startDate, endDate, prevStartDate, prevEndDate, periodLabel, comparisonLabel } = getPeriodDateRanges('custom', refDate, '2026-01-01', '2026-12-31');
+
+      const incomes = testDataset.incomes.filter((i) => i.date >= startDate && i.date <= endDate);
+      const expenses = testDataset.expenses.filter((e) => e.date >= startDate && e.date <= endDate);
+
+      const prevIncomes = testDataset.incomes.filter((i) => i.date >= prevStartDate! && i.date <= prevEndDate!);
+      const prevExpenses = testDataset.expenses.filter((e) => e.date >= prevStartDate! && e.date <= prevEndDate!);
+
+      const result = calculatePnLData(incomes, expenses, prevIncomes, prevExpenses, { periodLabel, comparisonLabel });
+
+      // Incomes for 2026: 100k + 50k + 80k + 60k = 290k (includes Aug 1 & Aug 31 boundaries)
+      expect(result.currentMonth.revenue).toBe(290000);
+      // Expenses for 2026: 30k + 20k + 25k + 15k = 90k
+      expect(result.currentMonth.expenses).toBe(90000);
+      // Net Income: 200k
+      expect(result.currentMonth.netIncome).toBe(200000);
+
+      // Prior equal length period (2025): Revenue 120k, Expenses 40k
+      expect(result.comparison.prevRevenue).toBe(120000);
+      expect(result.comparison.prevExpense).toBe(40000);
     });
 
     it('filters Full Year (2026) correctly excluding prior year records', () => {

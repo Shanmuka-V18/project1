@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { BarChart3, Download, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, FileText, Filter } from 'lucide-react';
+import { BarChart3, Download, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, FileText, Filter, Calendar, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -11,16 +11,28 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 export default function ReportsPage() {
   const [pnlData, setPnlData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [period, setPeriod] = useState<'this-month' | 'last-month' | 'year' | 'all-time'>('this-month');
+  const [period, setPeriod] = useState<'this-month' | 'last-month' | 'year' | 'all-time' | 'custom'>('this-month');
+
+  // Custom Date Range State
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [appliedFrom, setAppliedFrom] = useState('');
+  const [appliedTo, setAppliedTo] = useState('');
 
   useEffect(() => {
-    fetchPnL();
+    if (period !== 'custom') {
+      fetchPnL(period);
+    }
   }, [period]);
 
-  const fetchPnL = async () => {
+  const fetchPnL = async (targetPeriod: string, fromStr?: string, toStr?: string) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/reports/pnl?period=${period}`);
+      let url = `/api/reports/pnl?period=${targetPeriod}`;
+      if (targetPeriod === 'custom' && fromStr && toStr) {
+        url += `&from=${fromStr}&to=${toStr}`;
+      }
+      const res = await fetch(url);
       const data = await res.json();
       setPnlData(data);
     } catch (e) {
@@ -30,7 +42,33 @@ export default function ReportsPage() {
     }
   };
 
-  if (isLoading) {
+  const handlePeriodChange = (newPeriod: 'this-month' | 'last-month' | 'year' | 'all-time' | 'custom') => {
+    setPeriod(newPeriod);
+    if (newPeriod !== 'custom') {
+      setCustomFrom('');
+      setCustomTo('');
+      setAppliedFrom('');
+      setAppliedTo('');
+    }
+  };
+
+  const handleGenerateCustomReport = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customFrom || !customTo || customTo < customFrom) return;
+    setAppliedFrom(customFrom);
+    setAppliedTo(customTo);
+    fetchPnL('custom', customFrom, customTo);
+  };
+
+  // Custom Range Validation
+  const isCustomValid = Boolean(customFrom && customTo && customTo >= customFrom);
+  const isCustomError = Boolean(customFrom && customTo && customTo < customFrom);
+
+  const pdfUrl = period === 'custom' && appliedFrom && appliedTo
+    ? `/api/reports/pnl/pdf?period=custom&from=${appliedFrom}&to=${appliedTo}`
+    : `/api/reports/pnl/pdf?period=${period}`;
+
+  if (isLoading && !pnlData) {
     return <div className="py-20 text-center text-xs text-slate-500 dark:text-slate-400 font-medium">Generating Profit & Loss Report...</div>;
   }
 
@@ -56,8 +94,8 @@ export default function ReportsPage() {
           <MutedText className="mt-1 font-medium">Automated financial performance summary and period-over-period revenue growth comparison</MutedText>
         </div>
         <div className="flex items-center space-x-3">
-          <a href={`/api/reports/pnl/pdf?period=${period}`} download>
-            <Button className="bg-teal-600 hover:bg-teal-500 text-white">
+          <a href={pdfUrl} download>
+            <Button className="bg-teal-600 hover:bg-teal-500 text-white" disabled={period === 'custom' && (!appliedFrom || !appliedTo)}>
               <Download className="mr-2 h-4 w-4" /> Download P&L Statement
             </Button>
           </a>
@@ -65,14 +103,14 @@ export default function ReportsPage() {
       </div>
 
       {/* Period Filter Toolbar */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between text-xs">
-          <div className="flex items-center space-x-2">
-            <Filter className="h-4 w-4 text-slate-400" />
+      <Card className="p-4 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <Filter className="h-4 w-4 text-slate-400 shrink-0" />
             <span className="text-slate-500 dark:text-slate-400 font-medium">Reporting Period:</span>
-            <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-950 p-1 border border-slate-200 dark:border-slate-800">
+            <div className="flex flex-wrap items-center rounded-xl bg-slate-100 dark:bg-slate-950 p-1 border border-slate-200 dark:border-slate-800 gap-1">
               <button
-                onClick={() => setPeriod('this-month')}
+                onClick={() => handlePeriodChange('this-month')}
                 className={`px-3 py-1 rounded-lg font-semibold transition-colors ${
                   period === 'this-month' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
@@ -80,7 +118,7 @@ export default function ReportsPage() {
                 Current Month
               </button>
               <button
-                onClick={() => setPeriod('last-month')}
+                onClick={() => handlePeriodChange('last-month')}
                 className={`px-3 py-1 rounded-lg font-semibold transition-colors ${
                   period === 'last-month' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
@@ -88,7 +126,7 @@ export default function ReportsPage() {
                 Previous Month
               </button>
               <button
-                onClick={() => setPeriod('year')}
+                onClick={() => handlePeriodChange('year')}
                 className={`px-3 py-1 rounded-lg font-semibold transition-colors ${
                   period === 'year' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
@@ -96,16 +134,75 @@ export default function ReportsPage() {
                 Full Year
               </button>
               <button
-                onClick={() => setPeriod('all-time')}
+                onClick={() => handlePeriodChange('all-time')}
                 className={`px-3 py-1 rounded-lg font-semibold transition-colors ${
                   period === 'all-time' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
                 All Time
               </button>
+              <button
+                onClick={() => handlePeriodChange('custom')}
+                className={`px-3 py-1 rounded-lg font-semibold transition-colors ${
+                  period === 'custom' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                Custom Range
+              </button>
             </div>
           </div>
         </div>
+
+        {/* Custom Range Date Inputs Panel */}
+        {period === 'custom' && (
+          <form onSubmit={handleGenerateCustomReport} className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-3 animate-in fade-in duration-200">
+            <div className="flex flex-wrap items-end gap-4 text-xs">
+              <div>
+                <FormLabel className="mb-1 block">From Date</FormLabel>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="date"
+                    required
+                    value={customFrom}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                    className="rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 py-2 pl-9 pr-3 text-xs text-slate-900 dark:text-slate-100 focus:border-teal-500 focus:outline-none font-semibold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <FormLabel className="mb-1 block">To Date</FormLabel>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="date"
+                    required
+                    value={customTo}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                    className="rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 py-2 pl-9 pr-3 text-xs text-slate-900 dark:text-slate-100 focus:border-teal-500 focus:outline-none font-semibold"
+                  />
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={!isCustomValid || isLoading}
+                className="bg-teal-600 hover:bg-teal-500 text-white font-bold px-4 py-2 text-xs"
+              >
+                Generate Report
+              </Button>
+            </div>
+
+            {/* Validation Error Message */}
+            {isCustomError && (
+              <div className="flex items-center space-x-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold animate-in fade-in">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                <span>To Date must be on or after From Date</span>
+              </div>
+            )}
+          </form>
+        )}
       </Card>
 
       {/* KPI Comparison Cards */}
