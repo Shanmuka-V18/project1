@@ -2,166 +2,179 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import { calculateBalanceDue } from '@/lib/invoice-utils';
 
+export const dynamic = 'force-dynamic';
+
+function formatPdfCurrency(amount: number): string {
+  const val = Number(amount) || 0;
+  const numStr = val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `Rs. ${numStr}`;
+}
+
 export async function GET(request: Request, { params }: { params: { id: string } }) {
-  const currentUser = await getCurrentUser();
-  if (!currentUser) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const invoice = await prisma.invoice.findFirst({
-    where: { id: params.id, userId: currentUser.userId },
-  });
-
-  if (!invoice) {
-    return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
-  }
-
-  const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([600, 800]);
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-  const primaryColor = rgb(0.05, 0.58, 0.53); // Teal
-  const darkColor = rgb(0.06, 0.09, 0.16); // Navy
-  const grayColor = rgb(0.4, 0.45, 0.55);
-
-  let y = 750;
-
-  // Header Title
-  page.drawText((invoice.businessName || 'BUSINESS').toUpperCase(), {
-    x: 40,
-    y,
-    size: 20,
-    font: fontBold,
-    color: darkColor,
-  });
-
-  page.drawText('TAX INVOICE', {
-    x: 450,
-    y,
-    size: 18,
-    font: fontBold,
-    color: primaryColor,
-  });
-
-  y -= 25;
-  if (invoice.gstin) {
-    page.drawText(`GSTIN: ${invoice.gstin}`, { x: 40, y, size: 10, font, color: grayColor });
-  }
-  if (invoice.pan) {
-    page.drawText(`PAN: ${invoice.pan}`, { x: 200, y, size: 10, font, color: grayColor });
-  }
-  page.drawText(`Invoice #: ${invoice.invoiceNumber}`, { x: 450, y, size: 10, font: fontBold, color: darkColor });
-
-  y -= 15;
-  page.drawText(`Date: ${formatDate(invoice.createdAt)}`, { x: 450, y, size: 10, font, color: grayColor });
-  y -= 15;
-  page.drawText(`Due Date: ${formatDate(invoice.dueDate)}`, { x: 450, y, size: 10, font, color: grayColor });
-  y -= 15;
-  page.drawText(`Status: ${(invoice.status || 'DRAFT').toUpperCase()}`, { x: 450, y, size: 10, font: fontBold, color: primaryColor });
-  y -= 15;
-  page.drawText(`Payment Mode: ${invoice.paymentMode || 'Bank Transfer'}`, { x: 450, y, size: 10, font, color: darkColor });
-
-  y -= 20;
-  // Billed To Box
-  page.drawText('BILLED TO:', { x: 40, y, size: 11, font: fontBold, color: darkColor });
-  y -= 15;
-  page.drawText(invoice.clientName || 'Client', { x: 40, y, size: 12, font: fontBold, color: primaryColor });
-  y -= 15;
-  page.drawText(`Email: ${invoice.clientEmail || 'N/A'}`, { x: 40, y, size: 10, font, color: grayColor });
-  if (invoice.clientPhone) {
-    y -= 15;
-    page.drawText(`Phone: ${invoice.clientPhone}`, { x: 40, y, size: 10, font, color: grayColor });
-  }
-
-  y -= 35;
-  // Line Items Table Header
-  page.drawRectangle({
-    x: 40,
-    y: y - 5,
-    width: 520,
-    height: 25,
-    color: rgb(0.94, 0.96, 0.98),
-  });
-
-  page.drawText('Description', { x: 50, y, size: 10, font: fontBold, color: darkColor });
-  page.drawText('Qty', { x: 330, y, size: 10, font: fontBold, color: darkColor });
-  page.drawText('Unit Price', { x: 400, y, size: 10, font: fontBold, color: darkColor });
-  page.drawText('Amount', { x: 490, y, size: 10, font: fontBold, color: darkColor });
-
-  y -= 25;
-  let items: any[] = [];
   try {
-    items = JSON.parse(invoice.items || '[]');
-  } catch (e) {
-    items = [];
-  }
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  items.forEach((item: any) => {
-    page.drawText(String(item.description || 'Item').slice(0, 45), { x: 50, y, size: 10, font, color: darkColor });
-    page.drawText(String(item.quantity || 1), { x: 335, y, size: 10, font, color: darkColor });
-    page.drawText(formatCurrency(item.unitPrice || 0), { x: 400, y, size: 10, font, color: darkColor });
-    page.drawText(formatCurrency(item.amount || 0), { x: 490, y, size: 10, font, color: darkColor });
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: params.id, userId: currentUser.userId },
+    });
+
+    if (!invoice) {
+      return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
+    }
+
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([600, 800]);
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    const primaryColor = rgb(0.05, 0.58, 0.53); // Teal
+    const darkColor = rgb(0.06, 0.09, 0.16); // Navy
+    const grayColor = rgb(0.4, 0.45, 0.55);
+
+    let y = 750;
+
+    // Header Title
+    page.drawText((invoice.businessName || 'BUSINESS').toUpperCase(), {
+      x: 40,
+      y,
+      size: 20,
+      font: fontBold,
+      color: darkColor,
+    });
+
+    page.drawText('TAX INVOICE', {
+      x: 450,
+      y,
+      size: 18,
+      font: fontBold,
+      color: primaryColor,
+    });
+
+    y -= 25;
+    if (invoice.gstin) {
+      page.drawText(`GSTIN: ${invoice.gstin}`, { x: 40, y, size: 10, font, color: grayColor });
+    }
+    if (invoice.pan) {
+      page.drawText(`PAN: ${invoice.pan}`, { x: 200, y, size: 10, font, color: grayColor });
+    }
+    page.drawText(`Invoice #: ${invoice.invoiceNumber}`, { x: 450, y, size: 10, font: fontBold, color: darkColor });
+
+    y -= 15;
+    page.drawText(`Date: ${formatDate(invoice.createdAt)}`, { x: 450, y, size: 10, font, color: grayColor });
+    y -= 15;
+    page.drawText(`Due Date: ${formatDate(invoice.dueDate)}`, { x: 450, y, size: 10, font, color: grayColor });
+    y -= 15;
+    page.drawText(`Status: ${(invoice.status || 'DRAFT').toUpperCase()}`, { x: 450, y, size: 10, font: fontBold, color: primaryColor });
+    y -= 15;
+    page.drawText(`Payment Mode: ${invoice.paymentMode || 'Bank Transfer'}`, { x: 450, y, size: 10, font, color: darkColor });
+
     y -= 20;
-  });
+    // Billed To Box
+    page.drawText('BILLED TO:', { x: 40, y, size: 11, font: fontBold, color: darkColor });
+    y -= 15;
+    page.drawText(invoice.clientName || 'Client', { x: 40, y, size: 12, font: fontBold, color: primaryColor });
+    y -= 15;
+    page.drawText(`Email: ${invoice.clientEmail || 'N/A'}`, { x: 40, y, size: 10, font, color: grayColor });
+    if (invoice.clientPhone) {
+      y -= 15;
+      page.drawText(`Phone: ${invoice.clientPhone}`, { x: 40, y, size: 10, font, color: grayColor });
+    }
 
-  y -= 15;
-  page.drawLine({ start: { x: 40, y }, end: { x: 560, y }, thickness: 1, color: rgb(0.85, 0.88, 0.92) });
+    y -= 35;
+    // Line Items Table Header
+    page.drawRectangle({
+      x: 40,
+      y: y - 5,
+      width: 520,
+      height: 25,
+      color: rgb(0.94, 0.96, 0.98),
+    });
 
-  y -= 25;
-  // Summary
-  page.drawText('Subtotal:', { x: 380, y, size: 10, font, color: grayColor });
-  page.drawText(formatCurrency(invoice.subtotal || 0), { x: 480, y, size: 10, font, color: darkColor });
+    page.drawText('Description', { x: 50, y, size: 10, font: fontBold, color: darkColor });
+    page.drawText('Qty', { x: 330, y, size: 10, font: fontBold, color: darkColor });
+    page.drawText('Unit Price', { x: 400, y, size: 10, font: fontBold, color: darkColor });
+    page.drawText('Amount', { x: 490, y, size: 10, font: fontBold, color: darkColor });
 
-  y -= 18;
-  page.drawText('GST Amount:', { x: 380, y, size: 10, font, color: grayColor });
-  page.drawText(formatCurrency(invoice.gstAmount || 0), { x: 480, y, size: 10, font, color: darkColor });
+    y -= 25;
+    let items: any[] = [];
+    try {
+      items = JSON.parse(invoice.items || '[]');
+    } catch (e) {
+      items = [];
+    }
 
-  if ((invoice.discount || 0) > 0) {
+    items.forEach((item: any) => {
+      page.drawText(String(item.description || 'Item').slice(0, 45), { x: 50, y, size: 10, font, color: darkColor });
+      page.drawText(String(item.quantity || 1), { x: 335, y, size: 10, font, color: darkColor });
+      page.drawText(formatPdfCurrency(item.unitPrice || 0), { x: 400, y, size: 10, font, color: darkColor });
+      page.drawText(formatPdfCurrency(item.amount || 0), { x: 490, y, size: 10, font, color: darkColor });
+      y -= 20;
+    });
+
+    y -= 15;
+    page.drawLine({ start: { x: 40, y }, end: { x: 560, y }, thickness: 1, color: rgb(0.85, 0.88, 0.92) });
+
+    y -= 25;
+    // Summary
+    page.drawText('Subtotal:', { x: 380, y, size: 10, font, color: grayColor });
+    page.drawText(formatPdfCurrency(invoice.subtotal || 0), { x: 480, y, size: 10, font, color: darkColor });
+
     y -= 18;
-    page.drawText('Discount:', { x: 380, y, size: 10, font, color: grayColor });
-    page.drawText(`-${formatCurrency(invoice.discount)}`, { x: 480, y, size: 10, font, color: darkColor });
-  }
+    page.drawText('GST Amount:', { x: 380, y, size: 10, font, color: grayColor });
+    page.drawText(formatPdfCurrency(invoice.gstAmount || 0), { x: 480, y, size: 10, font, color: darkColor });
 
-  y -= 18;
-  page.drawText('Total Amount:', { x: 380, y, size: 10, font: fontBold, color: darkColor });
-  page.drawText(formatCurrency(invoice.total || 0), { x: 480, y, size: 10, font: fontBold, color: darkColor });
+    if ((invoice.discount || 0) > 0) {
+      y -= 18;
+      page.drawText('Discount:', { x: 380, y, size: 10, font, color: grayColor });
+      page.drawText(`-${formatPdfCurrency(invoice.discount)}`, { x: 480, y, size: 10, font, color: darkColor });
+    }
 
-  const amountPaid = invoice.amountPaid || 0;
-  if (amountPaid > 0 || invoice.status === 'Partially Paid') {
     y -= 18;
-    page.drawText('Amount Paid:', { x: 380, y, size: 10, font, color: rgb(0.06, 0.6, 0.3) });
-    page.drawText(formatCurrency(amountPaid), { x: 480, y, size: 10, font: fontBold, color: rgb(0.06, 0.6, 0.3) });
+    page.drawText('Total Amount:', { x: 380, y, size: 10, font: fontBold, color: darkColor });
+    page.drawText(formatPdfCurrency(invoice.total || 0), { x: 480, y, size: 10, font: fontBold, color: darkColor });
+
+    const amountPaid = invoice.amountPaid || 0;
+    if (amountPaid > 0 || invoice.status === 'Partially Paid') {
+      y -= 18;
+      page.drawText('Amount Paid:', { x: 380, y, size: 10, font, color: rgb(0.06, 0.6, 0.3) });
+      page.drawText(formatPdfCurrency(amountPaid), { x: 480, y, size: 10, font: fontBold, color: rgb(0.06, 0.6, 0.3) });
+    }
+
+    const balanceDue = calculateBalanceDue(invoice.total || 0, amountPaid);
+
+    y -= 25;
+    page.drawRectangle({
+      x: 360,
+      y: y - 5,
+      width: 200,
+      height: 30,
+      color: balanceDue === 0 ? rgb(0.9, 0.97, 0.96) : rgb(0.99, 0.95, 0.9),
+    });
+
+    page.drawText('BALANCE DUE:', { x: 370, y: y + 5, size: 11, font: fontBold, color: primaryColor });
+    page.drawText(formatPdfCurrency(balanceDue), { x: 480, y: y + 5, size: 12, font: fontBold, color: primaryColor });
+
+    y -= 60;
+    page.drawText('Thank you for your business!', { x: 220, y, size: 10, font, color: grayColor });
+
+    const pdfBytes = await pdfDoc.save();
+
+    return new Response(Buffer.from(pdfBytes), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${invoice.invoiceNumber}.pdf"`,
+        'Content-Length': String(pdfBytes.byteLength),
+      },
+    });
+  } catch (err: any) {
+    console.error('Invoice PDF Generation Error:', err);
+    return NextResponse.json({ error: err.message || 'Failed to generate PDF' }, { status: 500 });
   }
-
-  const balanceDue = calculateBalanceDue(invoice.total || 0, amountPaid);
-
-  y -= 25;
-  page.drawRectangle({
-    x: 360,
-    y: y - 5,
-    width: 200,
-    height: 30,
-    color: balanceDue === 0 ? rgb(0.9, 0.97, 0.96) : rgb(0.99, 0.95, 0.9),
-  });
-
-  page.drawText('BALANCE DUE:', { x: 370, y: y + 5, size: 11, font: fontBold, color: primaryColor });
-  page.drawText(formatCurrency(balanceDue), { x: 480, y: y + 5, size: 12, font: fontBold, color: primaryColor });
-
-  y -= 60;
-  page.drawText('Thank you for your business!', { x: 220, y, size: 10, font, color: grayColor });
-
-  const pdfBytes = await pdfDoc.save();
-
-  return new Response(Buffer.from(pdfBytes), {
-    status: 200,
-    headers: {
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="${invoice.invoiceNumber}.pdf"`,
-      'Content-Length': String(pdfBytes.byteLength),
-    },
-  });
 }
