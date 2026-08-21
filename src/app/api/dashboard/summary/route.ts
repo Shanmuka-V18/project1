@@ -14,74 +14,105 @@ export async function GET() {
   const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-  // 1. Current Month Incomes & Expenses
-  const currentMonthIncomes = await prisma.income.findMany({
-    where: {
-      userId: currentUser.userId,
-      date: { gte: startOfCurrentMonth, lte: endOfCurrentMonth },
-    },
-  });
+  const currentMonthNum = now.getMonth() + 1;
+  const currentYearNum = now.getFullYear();
 
-  const currentMonthExpenses = await prisma.expense.findMany({
-    where: {
-      userId: currentUser.userId,
-      date: { gte: startOfCurrentMonth, lte: endOfCurrentMonth },
-    },
-  });
+  // Prepare trend data promises for past 6 months
+  const trendMonthRanges = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const mStart = new Date(d.getFullYear(), d.getMonth(), 1);
+    const mEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+    const monthName = d.toLocaleString('en-IN', { month: 'short' });
+    trendMonthRanges.push({ monthName, mStart, mEnd });
+  }
+
+  // Execute all independent database queries concurrently via Promise.all
+  const [
+    currentMonthIncomes,
+    currentMonthExpenses,
+    activeInvoices,
+    userBudgets,
+    recentIncomes,
+    recentExpenses,
+    ...trendAggregations
+  ] = await Promise.all([
+    prisma.income.findMany({
+      where: { userId: currentUser.userId, date: { gte: startOfCurrentMonth, lte: endOfCurrentMonth } },
+    }),
+    prisma.expense.findMany({
+      where: { userId: currentUser.userId, date: { gte: startOfCurrentMonth, lte: endOfCurrentMonth } },
+    }),
+    prisma.invoice.findMany({
+      where: { userId: currentUser.userId, status: { in: ['Sent', 'Draft'] } },
+    }),
+    prisma.budget.findMany({
+      where: { userId: currentUser.userId, month: currentMonthNum, year: currentYearNum },
+    }),
+    prisma.income.findMany({
+      where: { userId: currentUser.userId },
+      orderBy: { date: 'desc' },
+      take: 5,
+    }),
+    prisma.expense.findMany({
+      where: { userId: currentUser.userId },
+      orderBy: { date: 'desc' },
+      take: 5,
+    }),
+    ...trendMonthRanges.flatMap(({ mStart, mEnd }) => [
+      prisma.income.aggregate({
+        where: { userId: currentUser.userId, date: { gte: mStart, lte: mEnd } },
+        _sum: { amount: true },
+      }),
+      prisma.expense.aggregate({
+        where: { userId: currentUser.userId, date: { gte: mStart, lte: mEnd } },
+        _sum: { amount: true },
+      }),
+    ]),
+  ]);
 
   const totalIncome = currentMonthIncomes.reduce((acc, curr) => acc + curr.amount, 0);
   const totalExpense = currentMonthExpenses.reduce((acc, curr) => acc + curr.amount, 0);
   const netProfit = totalIncome - totalExpense;
 
-  // Audit Spending Exceeds Income Notification
+  // Background notifications check (non-blocking)
   const spendingEval = evaluateSpendingExceedsIncome(totalIncome, totalExpense);
   if (spendingEval) {
-    const existingNotif = await prisma.notification.findFirst({
+    prisma.notification.findFirst({
       where: { userId: currentUser.userId, type: spendingEval.type, isRead: false },
-    });
-    if (!existingNotif) {
-      await prisma.notification.create({
-        data: {
-          userId: currentUser.userId,
-          type: spendingEval.type,
-          message: spendingEval.message,
-          isRead: false,
-        },
-      });
-    }
+    }).then((existing) => {
+      if (!existing) {
+        prisma.notification.create({
+          data: {
+            userId: currentUser.userId,
+            type: spendingEval.type,
+            message: spendingEval.message,
+            isRead: false,
+          },
+        }).catch(console.error);
+      }
+    }).catch(console.error);
   }
-
-  // Audit Invoice Due Notifications
-  const activeInvoices = await prisma.invoice.findMany({
-    where: { userId: currentUser.userId, status: { in: ['Sent', 'Draft'] } },
-  });
 
   for (const inv of activeInvoices) {
     const invoiceEval = evaluateInvoiceDueAlert(inv.dueDate, inv.clientName, inv.invoiceNumber, inv.status);
     if (invoiceEval) {
-      const existingInvNotif = await prisma.notification.findFirst({
+      prisma.notification.findFirst({
         where: { userId: currentUser.userId, message: invoiceEval.message, isRead: false },
-      });
-      if (!existingInvNotif) {
-        await prisma.notification.create({
-          data: {
-            userId: currentUser.userId,
-            type: invoiceEval.type,
-            message: invoiceEval.message,
-            isRead: false,
-          },
-        });
-      }
+      }).then((existing) => {
+        if (!existing) {
+          prisma.notification.create({
+            data: {
+              userId: currentUser.userId,
+              type: invoiceEval.type,
+              message: invoiceEval.message,
+              isRead: false,
+            },
+          }).catch(console.error);
+        }
+      }).catch(console.error);
     }
   }
-
-  // 2. Budgets & Exceeded Budgets
-  const currentMonthNum = now.getMonth() + 1;
-  const currentYearNum = now.getFullYear();
-
-  const userBudgets = await prisma.budget.findMany({
-    where: { userId: currentUser.userId, month: currentMonthNum, year: currentYearNum },
-  });
 
   // Calculate expense per category
   const expenseByCategoryMap: Record<string, number> = {};
@@ -95,7 +126,7 @@ export async function GET() {
     if (actualSpent >= b.monthlyLimit) exceededBudgetsCount++;
   });
 
-  // 3. Health Score
+  // Calculate health score & fire non-blocking background upsert
   const healthResult = calculateFinancialHealthScore(
     totalIncome,
     totalExpense,
@@ -103,8 +134,7 @@ export async function GET() {
     exceededBudgetsCount
   );
 
-  // Upsert health record in DB
-  await prisma.financialHealth.upsert({
+  prisma.financialHealth.upsert({
     where: {
       userId_month_year: {
         userId: currentUser.userId,
@@ -123,58 +153,40 @@ export async function GET() {
       month: currentMonthNum,
       year: currentYearNum,
     },
-  });
+  }).catch(console.error);
 
-  // 4. Income vs Expense Trend (Last 6 Months)
+  // Assemble trend data from parallel aggregations
   const trendData = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const mStart = new Date(d.getFullYear(), d.getMonth(), 1);
-    const mEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
-    const monthName = d.toLocaleString('en-IN', { month: 'short' });
+  for (let i = 0; i < trendMonthRanges.length; i++) {
+    const { monthName } = trendMonthRanges[i];
+    const mIncomes = trendAggregations[i * 2] as any;
+    const mExpenses = trendAggregations[i * 2 + 1] as any;
 
-    const mIncomes = await prisma.income.aggregate({
-      where: { userId: currentUser.userId, date: { gte: mStart, lte: mEnd } },
-      _sum: { amount: true },
-    });
-
-    const mExpenses = await prisma.expense.aggregate({
-      where: { userId: currentUser.userId, date: { gte: mStart, lte: mEnd } },
-      _sum: { amount: true },
-    });
+    const incomeVal = mIncomes?._sum?.amount || 0;
+    const expenseVal = mExpenses?._sum?.amount || 0;
 
     trendData.push({
       month: monthName,
-      income: mIncomes._sum.amount || 0,
-      expense: mExpenses._sum.amount || 0,
-      profit: (mIncomes._sum.amount || 0) - (mExpenses._sum.amount || 0),
+      income: incomeVal,
+      expense: expenseVal,
+      profit: incomeVal - expenseVal,
     });
   }
 
-  // 5. Category Breakdown Pie Chart
+  // Category breakdown
   const categoryBreakdown = Object.entries(expenseByCategoryMap).map(([category, amount]) => ({
     name: category,
     value: amount,
   }));
 
-  // 6. Recent Transactions (latest 6 combined)
-  const recentIncomes = (await prisma.income.findMany({
-    where: { userId: currentUser.userId },
-    orderBy: { date: 'desc' },
-    take: 5,
-  })).map(i => ({ ...i, type: 'Income' as const }));
-
-  const recentExpenses = (await prisma.expense.findMany({
-    where: { userId: currentUser.userId },
-    orderBy: { date: 'desc' },
-    take: 5,
-  })).map(e => ({ ...e, type: 'Expense' as const }));
-
-  const recentTransactions = [...recentIncomes, ...recentExpenses]
+  // Recent transactions
+  const mappedIncomes = recentIncomes.map((i) => ({ ...i, type: 'Income' as const }));
+  const mappedExpenses = recentExpenses.map((e) => ({ ...e, type: 'Expense' as const }));
+  const recentTransactions = [...mappedIncomes, ...mappedExpenses]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 6);
 
-  // 7. Dynamic AI Insight Banner text
+  // AI Insight text
   let insightText = '';
   if (totalIncome === 0) {
     insightText = 'Welcome! Start by adding your income sources and monthly expenses to generate AI insights.';

@@ -8,6 +8,7 @@ export interface CustomChartTooltipProps {
   payload?: any[];
   label?: string;
   currency?: boolean;
+  formatter?: (value: any) => string;
 }
 
 export function CustomChartTooltip({
@@ -15,6 +16,7 @@ export function CustomChartTooltip({
   payload,
   label,
   currency = true,
+  formatter,
 }: CustomChartTooltipProps) {
   if (active && payload && payload.length) {
     return (
@@ -36,7 +38,7 @@ export function CustomChartTooltip({
                   {name}:
                 </span>
                 <span className="font-extrabold text-slate-900 dark:text-slate-100">
-                  {currency ? formatCurrency(value) : value}
+                  {formatter ? formatter(value) : currency ? formatCurrency(value) : value}
                 </span>
               </div>
             );

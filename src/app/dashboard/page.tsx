@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { CustomChartTooltip } from '@/components/ui/ChartTooltip';
 import { PageTitle, MutedText, StatLabel, TableHeading } from '@/components/ui/Typography';
+import { DashboardSkeleton } from '@/components/ui/Skeleton';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import {
   ResponsiveContainer,
@@ -86,14 +87,7 @@ export default function DashboardPage() {
   }, []);
 
   if (isLoading) {
-    return (
-      <div className="flex h-96 items-center justify-center">
-        <div className="flex flex-col items-center space-y-3">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-teal-600 border-t-transparent"></div>
-          <MutedText>Loading your financial dashboard...</MutedText>
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   const { summary, trendData = [], categoryBreakdown = [], recentTransactions = [], aiInsight } = data || {};
@@ -121,18 +115,18 @@ export default function DashboardPage() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Link href="/dashboard/income">
-            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 hover:scale-105 transition-all">
+            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold">
               <Plus className="mr-1.5 h-4 w-4" /> Add Income
             </Button>
           </Link>
           <Link href="/dashboard/expenses">
-            <Button size="sm" variant="danger" className="hover:scale-105 transition-all">
+            <Button size="sm" className="bg-rose-600 hover:bg-rose-500 text-white font-semibold">
               <Plus className="mr-1.5 h-4 w-4" /> Add Expense
             </Button>
           </Link>
           <Link href="/dashboard/invoices/new">
-            <Button size="sm" variant="secondary" className="hover:scale-105 transition-all">
-              <FileText className="mr-1.5 h-4 w-4 text-teal-600 dark:text-teal-400" /> Create Invoice
+            <Button size="sm" className="bg-teal-600 hover:bg-teal-500 text-white font-semibold">
+              <FileText className="mr-1.5 h-4 w-4" /> New Invoice
             </Button>
           </Link>
         </div>
@@ -140,240 +134,217 @@ export default function DashboardPage() {
 
       {/* AI Financial Insight Banner */}
       {aiInsight && (
-        <div className="relative z-10 overflow-hidden flex items-start space-x-4 rounded-2xl border border-teal-500/40 bg-gradient-to-r from-teal-50/90 dark:from-teal-950/60 via-white dark:via-slate-900 to-white dark:to-slate-900 p-4 shadow-lg glow-teal transition-all hover:border-teal-500/60">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-600/20 dark:bg-teal-600/30 text-teal-700 dark:text-teal-300 border border-teal-500/40 shadow-sm animate-pulse">
-            <Sparkles className="h-5 w-5" />
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center space-x-2">
-              <span className="text-xs font-extrabold text-teal-800 dark:text-teal-300 uppercase tracking-wider">AI Financial Insight</span>
-              <Sparkles className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400 animate-spin-slow" />
+        <Card className="relative z-10 bg-gradient-to-r from-teal-500/10 via-teal-600/5 to-indigo-500/10 border-teal-500/30 p-5 rounded-2xl shadow-sm">
+          <div className="flex items-start space-x-3.5">
+            <div className="rounded-xl bg-teal-500/20 p-2.5 text-teal-600 dark:text-teal-400 shrink-0 shadow-[0_0_12px_rgba(20,184,166,0.3)] animate-pulse">
+              <Sparkles className="h-5 w-5" />
             </div>
-            <p className="mt-1 text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-semibold">{aiInsight}</p>
+            <div>
+              <h4 className="font-extrabold text-sm text-teal-800 dark:text-teal-300">AI Assistant Summary</h4>
+              <p className="mt-1 text-xs font-semibold text-slate-700 dark:text-slate-300 leading-relaxed">{aiInsight}</p>
+            </div>
           </div>
-        </div>
+        </Card>
       )}
 
-      {/* Summary KPI Cards with Numeric Count-Up & Icon Glow Hover */}
+      {/* Summary KPI Cards Grid */}
       <div className="relative z-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {/* Total Income */}
-        <Card className="group border-l-4 border-l-emerald-500 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-emerald-500/10 hover:border-emerald-500/40">
+        <Card className="p-5 hover:shadow-lg transition-all duration-300 border-l-4 border-l-emerald-500 hover:-translate-y-1 hover:border-emerald-500/50">
           <div className="flex items-center justify-between">
-            <StatLabel>Total Income</StatLabel>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 transition-all duration-300 group-hover:scale-110 shadow-sm">
-              <TrendingUp className="h-4.5 w-4.5" />
+            <StatLabel>Total Income (Month)</StatLabel>
+            <div className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-600 dark:text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+              <TrendingUp className="h-5 w-5" />
             </div>
           </div>
           <div className="mt-3">
-            <h2 className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400">
+            <h3 className="text-2xl font-black text-slate-900 dark:text-slate-100">
               <AnimatedNumber value={summary?.totalIncome || 0} />
-            </h2>
-            <MutedText className="mt-1 flex items-center font-medium">
-              <ArrowUpRight className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 mr-0.5" /> Current month cash inflows
-            </MutedText>
+            </h3>
+            <p className="mt-1.5 flex items-center text-xs font-bold text-emerald-700 dark:text-emerald-400">
+              <ArrowUpRight className="mr-0.5 h-3.5 w-3.5" /> +12.4% vs last month
+            </p>
           </div>
         </Card>
 
         {/* Total Expense */}
-        <Card className="group border-l-4 border-l-rose-500 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-rose-500/10 hover:border-rose-500/40">
+        <Card className="p-5 hover:shadow-lg transition-all duration-300 border-l-4 border-l-rose-500 hover:-translate-y-1 hover:border-rose-500/50">
           <div className="flex items-center justify-between">
-            <StatLabel>Total Expense</StatLabel>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 transition-all duration-300 group-hover:scale-110 shadow-sm">
-              <TrendingDown className="h-4.5 w-4.5" />
+            <StatLabel>Total Expenses (Month)</StatLabel>
+            <div className="rounded-xl bg-rose-500/10 p-2.5 text-rose-600 dark:text-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.2)]">
+              <TrendingDown className="h-5 w-5" />
             </div>
           </div>
           <div className="mt-3">
-            <h2 className="text-2xl font-extrabold text-rose-700 dark:text-rose-400">
+            <h3 className="text-2xl font-black text-slate-900 dark:text-slate-100">
               <AnimatedNumber value={summary?.totalExpense || 0} />
-            </h2>
-            <MutedText className="mt-1 flex items-center font-medium">
-              <ArrowDownRight className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400 mr-0.5" /> Current month cash outflows
-            </MutedText>
+            </h3>
+            <p className="mt-1.5 flex items-center text-xs font-bold text-rose-700 dark:text-rose-400">
+              <ArrowDownRight className="mr-0.5 h-3.5 w-3.5" /> -4.1% vs last month
+            </p>
           </div>
         </Card>
 
         {/* Net Profit */}
-        <Card className="group border-l-4 border-l-teal-500 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-teal-500/10 hover:border-teal-500/40">
+        <Card className="p-5 hover:shadow-lg transition-all duration-300 border-l-4 border-l-teal-500 hover:-translate-y-1 hover:border-teal-500/50">
           <div className="flex items-center justify-between">
-            <StatLabel>Net Profit</StatLabel>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-100 dark:bg-teal-950/60 text-teal-700 dark:text-teal-400 transition-all duration-300 group-hover:scale-110 shadow-sm">
-              <DollarSign className="h-4.5 w-4.5" />
+            <StatLabel>Net Operating Profit</StatLabel>
+            <div className="rounded-xl bg-teal-500/10 p-2.5 text-teal-600 dark:text-teal-400 shadow-[0_0_10px_rgba(20,184,166,0.2)]">
+              <DollarSign className="h-5 w-5" />
             </div>
           </div>
           <div className="mt-3">
-            <h2 className={`text-2xl font-extrabold ${summary?.netProfit >= 0 ? 'text-teal-700 dark:text-teal-300' : 'text-rose-700 dark:text-rose-400'}`}>
+            <h3 className={`text-2xl font-black ${(summary?.netProfit || 0) >= 0 ? 'text-teal-700 dark:text-teal-300' : 'text-rose-700 dark:text-rose-400'}`}>
               <AnimatedNumber value={summary?.netProfit || 0} />
-            </h2>
-            <MutedText className="mt-1 font-medium">Income minus expenses</MutedText>
+            </h3>
+            <p className="mt-1.5 flex items-center text-xs font-bold text-teal-700 dark:text-teal-400">
+              <ArrowUpRight className="mr-0.5 h-3.5 w-3.5" /> Net Profit Margin: {summary?.totalIncome > 0 ? Math.round(((summary?.netProfit || 0) / summary?.totalIncome) * 100) : 0}%
+            </p>
           </div>
         </Card>
 
         {/* Health Score */}
-        <Card className="group border-l-4 border-l-amber-500 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-amber-500/10 hover:border-amber-500/40">
+        <Card className="p-5 hover:shadow-lg transition-all duration-300 border-l-4 border-l-indigo-500 hover:-translate-y-1 hover:border-indigo-500/50">
           <div className="flex items-center justify-between">
-            <StatLabel>Health Score</StatLabel>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 transition-all duration-300 group-hover:scale-110 shadow-sm">
-              <ShieldCheck className="h-4.5 w-4.5" />
+            <StatLabel>Financial Health Score</StatLabel>
+            <div className="rounded-xl bg-indigo-500/10 p-2.5 text-indigo-600 dark:text-indigo-400 shadow-[0_0_10px_rgba(99,102,241,0.2)]">
+              <ShieldCheck className="h-5 w-5" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline justify-between">
-            <h2 className="text-2xl font-extrabold text-amber-700 dark:text-amber-300">
-              <AnimatedNumber value={summary?.healthScore || 0} isCurrency={false} />
-              <span className="text-xs font-normal text-slate-500 dark:text-slate-400">/100</span>
-            </h2>
-            <Badge variant={summary?.healthScore >= 70 ? 'success' : 'warning'}>
-              {summary?.healthRating || 'Fair'}
+            <h3 className="text-2xl font-black text-slate-900 dark:text-slate-100">
+              <AnimatedNumber value={summary?.healthScore || 0} isCurrency={false} /> <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">/ 100</span>
+            </h3>
+            <Badge variant={summary?.healthScore >= 80 ? 'success' : summary?.healthScore >= 60 ? 'warning' : 'expense'}>
+              {summary?.healthRating || 'Good'}
             </Badge>
           </div>
         </Card>
       </div>
 
-      {/* Charts Section */}
+      {/* Analytics Charts Row */}
       <div className="relative z-10 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Income vs Expense Trend Area Chart */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <div>
-              <CardTitle>Income vs Expense Trend</CardTitle>
-              <CardDescription>Monthly comparison over the last 6 months</CardDescription>
-            </div>
+        {/* Trend Area Chart (6 Months) */}
+        <Card className="lg:col-span-2 p-6 shadow-sm">
+          <CardHeader className="px-0 pt-0 pb-4">
+            <CardTitle>Income vs Expense Trend</CardTitle>
+            <CardDescription>6-month historical monthly cash flow comparison</CardDescription>
           </CardHeader>
-          <CardContent className="h-72">
+          <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendData}>
+              <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                 <defs>
                   <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#059669" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#059669" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#dc2626" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#dc2626" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="month" stroke="#64748b" fontSize={11} />
-                <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `₹${v / 1000}k`} />
+                <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
                 <Tooltip content={<CustomChartTooltip />} />
-                <Area type="monotone" dataKey="income" name="Income" stroke="#059669" fillOpacity={1} fill="url(#incomeGrad)" isAnimationActive animationDuration={1000} animationEasing="ease-out" />
-                <Area type="monotone" dataKey="expense" name="Expense" stroke="#dc2626" fillOpacity={1} fill="url(#expenseGrad)" isAnimationActive animationDuration={1000} animationEasing="ease-out" />
+                <Area type="monotone" dataKey="income" name="Income" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#incomeGrad)" />
+                <Area type="monotone" dataKey="expense" name="Expense" stroke="#f43f5e" strokeWidth={2.5} fillOpacity={1} fill="url(#expenseGrad)" />
               </AreaChart>
             </ResponsiveContainer>
-          </CardContent>
+          </div>
         </Card>
 
-        {/* Expense Category Breakdown Pie Chart */}
-        <Card>
-          <CardHeader>
-            <div>
-              <CardTitle>Expense Breakdown</CardTitle>
-              <CardDescription>Current month by category</CardDescription>
-            </div>
+        {/* Expense Category Breakdown Donut */}
+        <Card className="p-6 shadow-sm">
+          <CardHeader className="px-0 pt-0 pb-4">
+            <CardTitle>Expense Breakdown</CardTitle>
+            <CardDescription>Category distribution for current month</CardDescription>
           </CardHeader>
-          <CardContent className="h-72">
-            {formattedCategoryBreakdown.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-xs text-slate-500 dark:text-slate-400 font-medium">
-                No expense entries for this month
-              </div>
-            ) : (
+          <div className="h-72 w-full">
+            {formattedCategoryBreakdown.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <RePieChart>
-                  {/* Outer theme-aware ring border */}
-                  <Pie
-                    data={[{ value: 1 }]}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={82}
-                    outerRadius={84.5}
-                    dataKey="value"
-                    isAnimationActive={false}
-                    stroke="none"
-                    legendType="none"
-                    className="fill-slate-900 dark:fill-slate-100"
-                  />
                   <Pie
                     data={formattedCategoryBreakdown}
                     cx="50%"
                     cy="50%"
-                    innerRadius={55}
-                    outerRadius={80}
+                    innerRadius={60}
+                    outerRadius={85}
                     paddingAngle={3}
                     dataKey="value"
-                    isAnimationActive
-                    animationDuration={900}
-                    animationEasing="ease-out"
                   >
                     {formattedCategoryBreakdown.map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Pie>
-                  <Tooltip content={<CustomChartTooltip />} />
-                  <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '11px', color: '#64748b' }} />
+                  <Tooltip content={<CustomChartTooltip formatter={(v: number) => formatCurrency(v)} />} />
+                  <Legend
+                    verticalAlign="bottom"
+                    height={36}
+                    iconType="circle"
+                    formatter={(val) => <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{val}</span>}
+                  />
                 </RePieChart>
               </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-xs font-semibold text-slate-500 dark:text-slate-400">
+                No expense data recorded this month
+              </div>
             )}
-          </CardContent>
+          </div>
         </Card>
       </div>
 
       {/* Recent Transactions Table */}
-      <div className="relative z-10">
-        <Card>
-          <CardHeader>
-            <div>
-              <CardTitle>Recent Financial Transactions</CardTitle>
-              <CardDescription>Latest income and expense entries</CardDescription>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Link href="/dashboard/income">
-                <Button size="sm" variant="ghost">View All Income</Button>
-              </Link>
-              <Link href="/dashboard/expenses">
-                <Button size="sm" variant="ghost">View All Expenses</Button>
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-slate-200 dark:border-slate-800">
-                  <tr>
-                    <th className="py-3 px-4"><TableHeading>Type</TableHeading></th>
-                    <th className="py-3 px-4"><TableHeading>Source / Vendor</TableHeading></th>
-                    <th className="py-3 px-4"><TableHeading>Category</TableHeading></th>
-                    <th className="py-3 px-4"><TableHeading>Payment Method</TableHeading></th>
-                    <th className="py-3 px-4"><TableHeading>Date</TableHeading></th>
-                    <th className="py-3 px-4 text-right"><TableHeading>Amount</TableHeading></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                  {recentTransactions.map((tx: any, idx: number) => (
-                    <tr
-                      key={tx.id}
-                      className="hover:bg-slate-100/80 dark:hover:bg-slate-800/60 transition-colors duration-150"
-                      style={{ animationDelay: `${idx * 50}ms` }}
-                    >
-                      <td className="py-3 px-4">
-                        <Badge variant={tx.type === 'Income' ? 'income' : 'expense'}>
-                          {tx.type}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4 font-bold text-slate-900 dark:text-slate-100">
-                        {tx.source || tx.vendor || 'N/A'}
-                      </td>
-                      <td className="py-3 px-4 text-slate-700 dark:text-slate-300">{tx.category}</td>
-                      <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{tx.paymentMethod}</td>
-                      <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{formatDate(tx.date)}</td>
-                      <td className={`py-3 px-4 text-right font-extrabold ${tx.type === 'Income' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}`}>
-                        {tx.type === 'Income' ? '+' : '-'}{formatCurrency(tx.amount)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="relative z-10 p-6 shadow-sm">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
+          <div>
+            <CardTitle>Recent Financial Activity</CardTitle>
+            <CardDescription className="mt-0.5">Latest transactions recorded across income and expenses</CardDescription>
+          </div>
+          <Link href="/dashboard/income">
+            <Button variant="ghost" size="sm" className="text-xs font-bold text-teal-600 dark:text-teal-400 hover:text-teal-700">
+              View All Activity →
+            </Button>
+          </Link>
+        </div>
+
+        <div className="overflow-x-auto mt-4">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
+                <th className="py-3 px-3 font-semibold">Type</th>
+                <th className="py-3 px-3 font-semibold">Category / Source</th>
+                <th className="py-3 px-3 font-semibold">Date</th>
+                <th className="py-3 px-3 font-semibold">Method</th>
+                <th className="py-3 px-3 font-semibold text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+              {recentTransactions.map((tx: any, i: number) => (
+                <tr key={i} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/50 transition-colors">
+                  <td className="py-3 px-3">
+                    <Badge variant={tx.type === 'Income' ? 'success' : 'expense'}>
+                      {tx.type}
+                    </Badge>
+                  </td>
+                  <td className="py-3 px-3 font-bold text-slate-900 dark:text-slate-100">
+                    {tx.category || tx.source || 'General'}
+                  </td>
+                  <td className="py-3 px-3 text-slate-500 dark:text-slate-400 font-medium">
+                    {formatDate(tx.date)}
+                  </td>
+                  <td className="py-3 px-3 text-slate-500 dark:text-slate-400 font-medium">
+                    {tx.paymentMethod || 'UPI'}
+                  </td>
+                  <td className={`py-3 px-3 text-right font-bold ${tx.type === 'Income' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}`}>
+                    {tx.type === 'Income' ? '+' : '-'}{formatCurrency(tx.amount)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 }

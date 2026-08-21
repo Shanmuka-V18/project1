@@ -22,6 +22,25 @@ import {
 import { useAppStore } from '@/store/useStore';
 import { cn } from '@/lib/utils';
 
+const apiRouteMap: Record<string, string> = {
+  '/dashboard': '/api/dashboard/summary',
+  '/dashboard/income': '/api/income',
+  '/dashboard/expenses': '/api/expenses',
+  '/dashboard/budget': '/api/budgets',
+  '/dashboard/invoices': '/api/invoices',
+  '/dashboard/gst': '/api/gst',
+  '/dashboard/reports': '/api/reports/pnl',
+  '/dashboard/health-score': '/api/health-score',
+  '/dashboard/notifications': '/api/notifications',
+};
+
+function handlePrefetch(href: string) {
+  const apiRoute = apiRouteMap[href];
+  if (apiRoute && typeof window !== 'undefined') {
+    fetch(apiRoute, { priority: 'low' as any }).catch(() => {});
+  }
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const { isSidebarOpen, toggleSidebar, unreadNotificationsCount } = useAppStore();
@@ -83,6 +102,9 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={true}
+              onMouseEnter={() => handlePrefetch(item.href)}
+              onFocus={() => handlePrefetch(item.href)}
               className={cn(
                 'group flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-150',
                 isActive

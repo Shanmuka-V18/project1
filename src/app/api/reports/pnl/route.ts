@@ -16,28 +16,25 @@ export async function GET(request: Request) {
 
   const { startDate, endDate, prevStartDate, prevEndDate, periodLabel, comparisonLabel } = getPeriodDateRanges(period, new Date(), from, to);
 
-  // Current Period Data
-  const incomes = await prisma.income.findMany({
-    where: { userId: currentUser.userId, date: { gte: startDate, lte: endDate } },
-  });
-
-  const expenses = await prisma.expense.findMany({
-    where: { userId: currentUser.userId, date: { gte: startDate, lte: endDate } },
-  });
-
-  // Previous Period Data
-  let prevIncomes: any[] = [];
-  let prevExpenses: any[] = [];
-
-  if (prevStartDate && prevEndDate) {
-    prevIncomes = await prisma.income.findMany({
-      where: { userId: currentUser.userId, date: { gte: prevStartDate, lte: prevEndDate } },
-    });
-
-    prevExpenses = await prisma.expense.findMany({
-      where: { userId: currentUser.userId, date: { gte: prevStartDate, lte: prevEndDate } },
-    });
-  }
+  // Parallelize current and previous period queries
+  const [incomes, expenses, prevIncomes, prevExpenses] = await Promise.all([
+    prisma.income.findMany({
+      where: { userId: currentUser.userId, date: { gte: startDate, lte: endDate } },
+    }),
+    prisma.expense.findMany({
+      where: { userId: currentUser.userId, date: { gte: startDate, lte: endDate } },
+    }),
+    prevStartDate && prevEndDate
+      ? prisma.income.findMany({
+          where: { userId: currentUser.userId, date: { gte: prevStartDate, lte: prevEndDate } },
+        })
+      : Promise.resolve([]),
+    prevStartDate && prevEndDate
+      ? prisma.expense.findMany({
+          where: { userId: currentUser.userId, date: { gte: prevStartDate, lte: prevEndDate } },
+        })
+      : Promise.resolve([]),
+  ]);
 
   const result = calculatePnLData(incomes, expenses, prevIncomes, prevExpenses, {
     periodLabel,
