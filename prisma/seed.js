@@ -195,7 +195,7 @@ async function main() {
     { type: 'Budget Reminder', message: 'You have reached 82% of your Misc expense budget for this month.', isRead: false },
     { type: 'Invoice Due', message: 'Invoice INV-2026-0002 for Nexus Global Enterprises is due on 28th.', isRead: false },
     { type: 'Monthly Report', message: 'Your monthly P&L summary for previous month is ready to review.', isRead: true },
-    { type: 'Low Balance', message: 'Cash reserves are healthy above target threshold.', isRead: true },
+    { type: 'Low Balance', message: 'Low Balance Warning: Cash reserve (₹42,000) is below 15% safety margin target.', isRead: true },
   ];
 
   for (const notif of notifications) {
