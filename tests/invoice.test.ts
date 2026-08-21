@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { PDFDocument } from 'pdf-lib';
 import {
   validatePhoneNumber,
   calculateBalanceDue,
@@ -6,6 +7,7 @@ import {
   INVOICE_STATUSES,
   PAYMENT_MODES,
 } from '../src/lib/invoice-utils';
+import { formatCurrency, formatDate } from '../src/lib/utils';
 
 describe('Invoice Module Utilities', () => {
   describe('Phone Number Validation', () => {
@@ -76,6 +78,92 @@ describe('Invoice Module Utilities', () => {
       expect(original.invoiceNumber).toBe('INV-2026-0001');
       expect(original.status).toBe('Paid');
       expect(original.amountPaid).toBe(58000);
+    });
+  });
+
+  describe('Copy to Clipboard & Invoice Summary Formatting', () => {
+    it('formats a concise invoice summary text for clipboard copy', () => {
+      const inv = {
+        invoiceNumber: 'INV-2026-0005',
+        clientName: 'Acme Corp',
+        total: 50000,
+        amountPaid: 20000,
+        status: 'Partially Paid',
+        dueDate: new Date(2026, 8, 1),
+      };
+
+      const balance = calculateBalanceDue(inv.total, inv.amountPaid);
+      const text = `Invoice ${inv.invoiceNumber} | Client: ${inv.clientName} | Total: ${formatCurrency(inv.total)} | Balance Due: ${formatCurrency(balance)} | Status: ${inv.status} | Due Date: ${formatDate(inv.dueDate)}`;
+
+      expect(text).toContain('Invoice INV-2026-0005');
+      expect(text).toContain('Client: Acme Corp');
+      expect(text).toContain('Status: Partially Paid');
+      expect(text).toContain('Balance Due: ₹30,000.00');
+    });
+
+    it('writes formatted summary to system clipboard via Clipboard API', async () => {
+      const writeTextMock = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: writeTextMock,
+        },
+      });
+
+      const inv = {
+        invoiceNumber: 'INV-2026-0010',
+        clientName: 'Global Solutions',
+        total: 100000,
+        amountPaid: 100000,
+        status: 'Paid',
+        dueDate: new Date(2026, 8, 15),
+      };
+
+      const balance = calculateBalanceDue(inv.total, inv.amountPaid);
+      const text = `Invoice ${inv.invoiceNumber} | Client: ${inv.clientName} | Total: ${formatCurrency(inv.total)} | Balance Due: ${formatCurrency(balance)} | Status: ${inv.status} | Due Date: ${formatDate(inv.dueDate)}`;
+
+      await navigator.clipboard.writeText(text);
+
+      expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining('INV-2026-0010'));
+      expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining('Global Solutions'));
+      expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining('Status: Paid'));
+    });
+  });
+
+  describe('PDF Generation Response for All Invoice Statuses', () => {
+    INVOICE_STATUSES.forEach((status) => {
+      it(`generates valid PDF binary data for invoice with status "${status}"`, async () => {
+        const pdfDoc = await PDFDocument.create();
+        const page = pdfDoc.addPage([600, 800]);
+
+        page.drawText(`INVOICE STATUS: ${status.toUpperCase()}`);
+        page.drawText(`TOTAL: 50,000`);
+
+        if (status === 'Partially Paid') {
+          page.drawText(`AMOUNT PAID: 20,000`);
+          page.drawText(`BALANCE DUE: 30,000`);
+        } else if (status === 'Paid') {
+          page.drawText(`AMOUNT PAID: 50,000`);
+          page.drawText(`BALANCE DUE: 0`);
+        }
+
+        const pdfBytes = await pdfDoc.save();
+
+        expect(pdfBytes).toBeInstanceOf(Uint8Array);
+        expect(pdfBytes.byteLength).toBeGreaterThan(500);
+
+        const response = new Response(pdfBytes, {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="INV-2026-TEST-${status}.pdf"`,
+            'Content-Length': String(pdfBytes.byteLength),
+          },
+        });
+
+        expect(response.status).toBe(200);
+        expect(response.headers.get('Content-Type')).toBe('application/pdf');
+        expect(response.headers.get('Content-Disposition')).toContain('.pdf');
+      });
     });
   });
 

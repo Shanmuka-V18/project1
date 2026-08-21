@@ -31,7 +31,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
   let y = 750;
 
   // Header Title
-  page.drawText(invoice.businessName.toUpperCase(), {
+  page.drawText((invoice.businessName || 'BUSINESS').toUpperCase(), {
     x: 40,
     y,
     size: 20,
@@ -61,7 +61,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
   y -= 15;
   page.drawText(`Due Date: ${formatDate(invoice.dueDate)}`, { x: 450, y, size: 10, font, color: grayColor });
   y -= 15;
-  page.drawText(`Status: ${invoice.status.toUpperCase()}`, { x: 450, y, size: 10, font: fontBold, color: primaryColor });
+  page.drawText(`Status: ${(invoice.status || 'DRAFT').toUpperCase()}`, { x: 450, y, size: 10, font: fontBold, color: primaryColor });
   y -= 15;
   page.drawText(`Payment Mode: ${invoice.paymentMode || 'Bank Transfer'}`, { x: 450, y, size: 10, font, color: darkColor });
 
@@ -69,9 +69,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
   // Billed To Box
   page.drawText('BILLED TO:', { x: 40, y, size: 11, font: fontBold, color: darkColor });
   y -= 15;
-  page.drawText(invoice.clientName, { x: 40, y, size: 12, font: fontBold, color: primaryColor });
+  page.drawText(invoice.clientName || 'Client', { x: 40, y, size: 12, font: fontBold, color: primaryColor });
   y -= 15;
-  page.drawText(`Email: ${invoice.clientEmail}`, { x: 40, y, size: 10, font, color: grayColor });
+  page.drawText(`Email: ${invoice.clientEmail || 'N/A'}`, { x: 40, y, size: 10, font, color: grayColor });
   if (invoice.clientPhone) {
     y -= 15;
     page.drawText(`Phone: ${invoice.clientPhone}`, { x: 40, y, size: 10, font, color: grayColor });
@@ -93,12 +93,18 @@ export async function GET(request: Request, { params }: { params: { id: string }
   page.drawText('Amount', { x: 490, y, size: 10, font: fontBold, color: darkColor });
 
   y -= 25;
-  const items = JSON.parse(invoice.items || '[]');
+  let items: any[] = [];
+  try {
+    items = JSON.parse(invoice.items || '[]');
+  } catch (e) {
+    items = [];
+  }
+
   items.forEach((item: any) => {
-    page.drawText(String(item.description).slice(0, 45), { x: 50, y, size: 10, font, color: darkColor });
-    page.drawText(String(item.quantity), { x: 335, y, size: 10, font, color: darkColor });
-    page.drawText(formatCurrency(item.unitPrice), { x: 400, y, size: 10, font, color: darkColor });
-    page.drawText(formatCurrency(item.amount), { x: 490, y, size: 10, font, color: darkColor });
+    page.drawText(String(item.description || 'Item').slice(0, 45), { x: 50, y, size: 10, font, color: darkColor });
+    page.drawText(String(item.quantity || 1), { x: 335, y, size: 10, font, color: darkColor });
+    page.drawText(formatCurrency(item.unitPrice || 0), { x: 400, y, size: 10, font, color: darkColor });
+    page.drawText(formatCurrency(item.amount || 0), { x: 490, y, size: 10, font, color: darkColor });
     y -= 20;
   });
 
@@ -108,13 +114,13 @@ export async function GET(request: Request, { params }: { params: { id: string }
   y -= 25;
   // Summary
   page.drawText('Subtotal:', { x: 380, y, size: 10, font, color: grayColor });
-  page.drawText(formatCurrency(invoice.subtotal), { x: 480, y, size: 10, font, color: darkColor });
+  page.drawText(formatCurrency(invoice.subtotal || 0), { x: 480, y, size: 10, font, color: darkColor });
 
   y -= 18;
   page.drawText('GST Amount:', { x: 380, y, size: 10, font, color: grayColor });
-  page.drawText(formatCurrency(invoice.gstAmount), { x: 480, y, size: 10, font, color: darkColor });
+  page.drawText(formatCurrency(invoice.gstAmount || 0), { x: 480, y, size: 10, font, color: darkColor });
 
-  if (invoice.discount > 0) {
+  if ((invoice.discount || 0) > 0) {
     y -= 18;
     page.drawText('Discount:', { x: 380, y, size: 10, font, color: grayColor });
     page.drawText(`-${formatCurrency(invoice.discount)}`, { x: 480, y, size: 10, font, color: darkColor });
@@ -122,15 +128,16 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
   y -= 18;
   page.drawText('Total Amount:', { x: 380, y, size: 10, font: fontBold, color: darkColor });
-  page.drawText(formatCurrency(invoice.total), { x: 480, y, size: 10, font: fontBold, color: darkColor });
+  page.drawText(formatCurrency(invoice.total || 0), { x: 480, y, size: 10, font: fontBold, color: darkColor });
 
-  if ((invoice.amountPaid || 0) > 0) {
+  const amountPaid = invoice.amountPaid || 0;
+  if (amountPaid > 0 || invoice.status === 'Partially Paid') {
     y -= 18;
     page.drawText('Amount Paid:', { x: 380, y, size: 10, font, color: rgb(0.06, 0.6, 0.3) });
-    page.drawText(formatCurrency(invoice.amountPaid), { x: 480, y, size: 10, font: fontBold, color: rgb(0.06, 0.6, 0.3) });
+    page.drawText(formatCurrency(amountPaid), { x: 480, y, size: 10, font: fontBold, color: rgb(0.06, 0.6, 0.3) });
   }
 
-  const balanceDue = calculateBalanceDue(invoice.total, invoice.amountPaid || 0);
+  const balanceDue = calculateBalanceDue(invoice.total || 0, amountPaid);
 
   y -= 25;
   page.drawRectangle({
@@ -154,6 +161,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${invoice.invoiceNumber}.pdf"`,
+      'Content-Length': String(pdfBytes.byteLength),
     },
   });
 }

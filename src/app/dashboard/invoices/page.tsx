@@ -10,10 +10,14 @@ import {
   Eye,
   Trash2,
   Copy,
+  CopyPlus,
+  Clipboard,
+  Check,
   Edit2,
   Filter,
-  MoreVertical,
   AlertTriangle,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -29,8 +33,12 @@ export default function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [paymentModeFilter, setPaymentModeFilter] = useState('All');
 
-  // Active action menu
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  // Copy feedback state
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Toast feedback state
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastError, setToastError] = useState<string | null>(null);
 
   // Modal deletion state
   const [deletingInvoice, setDeletingInvoice] = useState<any | null>(null);
@@ -39,6 +47,16 @@ export default function InvoicesPage() {
   useEffect(() => {
     fetchInvoices();
   }, [statusFilter, paymentModeFilter]);
+
+  useEffect(() => {
+    if (toastMessage || toastError) {
+      const timer = setTimeout(() => {
+        setToastMessage(null);
+        setToastError(null);
+      }, 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage, toastError]);
 
   const fetchInvoices = async () => {
     setIsLoading(true);
@@ -58,8 +76,54 @@ export default function InvoicesPage() {
   };
 
   const handleDuplicate = (id: string) => {
-    setActiveMenuId(null);
     router.push(`/dashboard/invoices/new?duplicateFrom=${id}`);
+  };
+
+  const handleCopyToClipboard = async (inv: any) => {
+    const balance = calculateBalanceDue(inv.total, inv.amountPaid || 0);
+    const text = `Invoice ${inv.invoiceNumber} | Client: ${inv.clientName} | Total: ${formatCurrency(inv.total)} | Balance Due: ${formatCurrency(balance)} | Status: ${inv.status} | Due Date: ${formatDate(inv.dueDate)}`;
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      setCopiedId(inv.id);
+      setToastMessage(`Copied ${inv.invoiceNumber} summary to clipboard!`);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (err) {
+      console.error('Clipboard copy error:', err);
+      setToastError('Failed to copy invoice summary to clipboard');
+    }
+  };
+
+  const handleDownloadPdf = async (id: string, invoiceNumber: string) => {
+    try {
+      const res = await fetch(`/api/invoices/${id}/pdf`);
+      if (!res.ok) {
+        throw new Error(`Failed to generate PDF (${res.status})`);
+      }
+      const blob = await res.blob();
+      const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${invoiceNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setToastMessage(`Downloaded ${invoiceNumber}.pdf successfully!`);
+    } catch (err: any) {
+      console.error('PDF download error:', err);
+      setToastError(`Failed to download PDF: ${err.message || 'Error'}`);
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -69,10 +133,12 @@ export default function InvoicesPage() {
       const res = await fetch(`/api/invoices/${deletingInvoice.id}`, { method: 'DELETE' });
       if (res.ok) {
         setDeletingInvoice(null);
+        setToastMessage(`Invoice ${deletingInvoice.invoiceNumber} deleted`);
         fetchInvoices();
       }
     } catch (e) {
       console.error(e);
+      setToastError('Failed to delete invoice');
     } finally {
       setIsDeleting(false);
     }
@@ -81,7 +147,21 @@ export default function InvoicesPage() {
   const totalInvoiced = invoices.reduce((acc, curr) => acc + curr.total, 0);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-6 animate-in fade-in duration-300 relative">
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div className="fixed top-20 right-6 z-50 flex items-center space-x-2 rounded-xl bg-emerald-600 text-white px-4 py-2.5 text-xs font-bold shadow-xl animate-in slide-in-from-top-3 duration-200">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+      {toastError && (
+        <div className="fixed top-20 right-6 z-50 flex items-center space-x-2 rounded-xl bg-rose-600 text-white px-4 py-2.5 text-xs font-bold shadow-xl animate-in slide-in-from-top-3 duration-200">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{toastError}</span>
+        </div>
+      )}
+
       {/* Top Banner */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -222,44 +302,60 @@ export default function InvoicesPage() {
                       <td className="py-3.5 px-4 text-right font-bold text-teal-600 dark:text-teal-300">
                         {formatCurrency(balanceDue)}
                       </td>
-                      <td className="py-3.5 px-4 text-center relative">
+                      <td className="py-3.5 px-4 text-center">
                         <div className="flex items-center justify-center space-x-1">
+                          {/* 1. View Invoice */}
                           <Link href={`/dashboard/invoices/${inv.id}`}>
                             <button
                               title="View Invoice"
-                              className="rounded p-1 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-teal-600 dark:hover:text-teal-400"
+                              className="rounded p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
                             >
                               <Eye className="h-4 w-4" />
                             </button>
                           </Link>
 
+                          {/* 2. Duplicate Invoice (New Draft) */}
                           <button
-                            title="Duplicate Invoice"
+                            title="Duplicate Invoice (New Draft)"
                             onClick={() => handleDuplicate(inv.id)}
-                            className="rounded p-1 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-teal-600 dark:hover:text-teal-400"
+                            className="rounded p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
                           >
-                            <Copy className="h-4 w-4" />
+                            <CopyPlus className="h-4 w-4" />
                           </button>
 
+                          {/* 3. Copy Summary to Clipboard */}
+                          <button
+                            title="Copy Summary to Clipboard"
+                            onClick={() => handleCopyToClipboard(inv)}
+                            className="rounded p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
+                          >
+                            {copiedId === inv.id ? <Check className="h-4 w-4 text-emerald-500" /> : <Clipboard className="h-4 w-4" />}
+                          </button>
+
+                          {/* 4. Edit Invoice */}
                           <Link href={`/dashboard/invoices/new?editId=${inv.id}`}>
                             <button
                               title="Edit Invoice"
-                              className="rounded p-1 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-teal-600 dark:hover:text-teal-400"
+                              className="rounded p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
                             >
                               <Edit2 className="h-4 w-4" />
                             </button>
                           </Link>
 
-                          <a href={`/api/invoices/${inv.id}/pdf`} download title="Download PDF">
-                            <button className="rounded p-1 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-teal-600 dark:hover:text-teal-400">
-                              <Download className="h-4 w-4" />
-                            </button>
-                          </a>
+                          {/* 5. Download PDF */}
+                          <button
+                            title="Download PDF"
+                            onClick={() => handleDownloadPdf(inv.id, inv.invoiceNumber)}
+                            className="rounded p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
+                          >
+                            <Download className="h-4 w-4" />
+                          </button>
 
+                          {/* 6. Delete Invoice */}
                           <button
                             title="Delete Invoice"
                             onClick={() => setDeletingInvoice(inv)}
-                            className="rounded p-1 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-rose-600 dark:hover:text-rose-400"
+                            className="rounded p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
