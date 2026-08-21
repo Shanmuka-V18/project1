@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
+import { createPasswordResetToken } from '@/lib/password-reset';
 
 const forgotPasswordSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -12,19 +13,22 @@ export async function POST(request: Request) {
     const validated = forgotPasswordSchema.parse(body);
 
     const user = await prisma.user.findUnique({
-      where: { email: validated.email },
+      where: { email: validated.email.toLowerCase() },
     });
 
     if (!user) {
-      // Return success even if user not found to avoid email enumeration
+      // Standard safe response to prevent email enumeration
       return NextResponse.json({
         message: 'If an account exists with that email, password reset instructions have been sent.',
       });
     }
 
-    // Return friendly confirmation message
+    // Generate single-use, 15-min reset token & log URL
+    const resetInfo = createPasswordResetToken(user.email);
+
     return NextResponse.json({
       message: 'Password reset link sent to your email address.',
+      resetUrl: resetInfo.resetUrl,
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {

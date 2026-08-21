@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { items } = await request.json(); // Array of parsed CSV items: { amount, category, vendor, date, paymentMethod, notes }
+    const { items } = await request.json(); // Array of parsed CSV items
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'No items provided for import' }, { status: 400 });
     }
@@ -23,7 +23,11 @@ export async function POST(request: Request) {
       const paymentMethod = ['Cash', 'UPI', 'Bank', 'Card'].includes(item.paymentMethod)
         ? item.paymentMethod
         : 'Bank';
-      const date = item.date ? new Date(item.date) : new Date();
+
+      let parsedDate = item.date ? new Date(item.date) : new Date();
+      if (isNaN(parsedDate.getTime())) {
+        parsedDate = new Date(); // Fallback to current date for invalid dates in bulk import
+      }
 
       const created = await prisma.expense.create({
         data: {
@@ -32,7 +36,7 @@ export async function POST(request: Request) {
           category,
           subcategory: item.subcategory || null,
           vendor: item.vendor || null,
-          date,
+          date: parsedDate,
           paymentMethod,
           notes: item.notes || 'CSV Bulk Import',
         },
@@ -45,6 +49,6 @@ export async function POST(request: Request) {
       importedCount: createdExpenses.length,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'CSV Import failed' }, { status: 500 });
+    return NextResponse.json({ error: 'CSV Import failed. Please check file format.' }, { status: 400 });
   }
 }

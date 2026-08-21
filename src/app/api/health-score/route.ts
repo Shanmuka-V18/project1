@@ -22,12 +22,14 @@ export async function GET() {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const m = d.getMonth() + 1;
     const y = d.getFullYear();
+    const startDate = new Date(y, m - 1, 1);
+    const endDate = new Date(y, m, 0, 23, 59, 59);
     const monthLabel = d.toLocaleString('en-IN', { month: 'short' });
-    trendMonthTargets.push({ m, y, monthLabel, index: i });
+    trendMonthTargets.push({ m, y, startDate, endDate, monthLabel, isCurrentMonth: i === 0 });
   }
 
-  // Execute all queries in one parallel batch via Promise.all
-  const [incomes, expenses, userBudgets, ...healthRecords] = await Promise.all([
+  // Execute current month base queries
+  const [incomes, expenses, userBudgets] = await Promise.all([
     prisma.income.findMany({
       where: { userId: currentUser.userId, date: { gte: startOfCurrentMonth, lte: endOfCurrentMonth } },
     }),
@@ -37,17 +39,6 @@ export async function GET() {
     prisma.budget.findMany({
       where: { userId: currentUser.userId, month: monthNum, year: yearNum },
     }),
-    ...trendMonthTargets.map(({ m, y }) =>
-      prisma.financialHealth.findUnique({
-        where: {
-          userId_month_year: {
-            userId: currentUser.userId,
-            month: m,
-            year: y,
-          },
-        },
-      })
-    ),
   ]);
 
   const totalIncome = incomes.reduce((acc, curr) => acc + curr.amount, 0);
@@ -71,13 +62,49 @@ export async function GET() {
     exceededBudgetsCount
   );
 
-  const trendHistory = trendMonthTargets.map(({ monthLabel, index }, idx) => {
-    const healthRec = healthRecords[idx];
-    return {
-      month: monthLabel,
-      score: healthRec ? healthRec.score : (index === 0 ? healthResult.score : 75),
-    };
-  });
+  // Compute actual trend history for 6 months (no random dummy values)
+  const trendHistory = await Promise.all(
+    trendMonthTargets.map(async (target) => {
+      if (target.isCurrentMonth) {
+        return { month: target.monthLabel, score: healthResult.score };
+      }
+
+      // Check DB for recorded health score
+      const healthRec = await prisma.financialHealth.findUnique({
+        where: {
+          userId_month_year: {
+            userId: currentUser.userId,
+            month: target.m,
+            year: target.y,
+          },
+        },
+      });
+
+      if (healthRec) {
+        return { month: target.monthLabel, score: healthRec.score };
+      }
+
+      // Calculate real score from past month income/expenses
+      const [pastIncomes, pastExpenses] = await Promise.all([
+        prisma.income.findMany({
+          where: { userId: currentUser.userId, date: { gte: target.startDate, lte: target.endDate } },
+        }),
+        prisma.expense.findMany({
+          where: { userId: currentUser.userId, date: { gte: target.startDate, lte: target.endDate } },
+        }),
+      ]);
+
+      const pastIncTotal = pastIncomes.reduce((acc, curr) => acc + curr.amount, 0);
+      const pastExpTotal = pastExpenses.reduce((acc, curr) => acc + curr.amount, 0);
+
+      if (pastIncTotal === 0 && pastExpTotal === 0) {
+        return { month: target.monthLabel, score: null }; // Return null for months with no data
+      }
+
+      const pastHealth = calculateFinancialHealthScore(pastIncTotal, pastExpTotal, 0, 0);
+      return { month: target.monthLabel, score: pastHealth.score };
+    })
+  );
 
   return NextResponse.json({
     currentScore: healthResult.score,

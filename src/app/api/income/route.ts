@@ -54,13 +54,18 @@ export async function POST(request: Request) {
     const body = await request.json();
     const validated = incomeSchema.parse(body);
 
+    const parsedDate = new Date(validated.date);
+    if (isNaN(parsedDate.getTime())) {
+      return NextResponse.json({ error: 'Invalid date format provided' }, { status: 400 });
+    }
+
     const newIncome = await prisma.income.create({
       data: {
         userId: currentUser.userId,
         amount: validated.amount,
         source: validated.source,
         category: validated.category,
-        date: new Date(validated.date),
+        date: parsedDate,
         paymentMethod: validated.paymentMethod,
         notes: validated.notes || null,
         receiptUrl: validated.receiptUrl || null,
@@ -73,6 +78,6 @@ export async function POST(request: Request) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors[0].message }, { status: 400 });
     }
-    return NextResponse.json({ error: error.message || 'Failed to create income' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create income entry' }, { status: 400 });
   }
 }

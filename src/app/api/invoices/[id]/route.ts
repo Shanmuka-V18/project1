@@ -1,7 +1,30 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { validatePhoneNumber } from '@/lib/invoice-utils';
+import { z } from 'zod';
+import { validatePhoneNumber, INVOICE_STATUSES, PAYMENT_MODES } from '@/lib/invoice-utils';
+
+const updateInvoiceItemSchema = z.object({
+  description: z.string().min(1, 'Description required'),
+  quantity: z.number().positive('Quantity must be greater than 0'),
+  unitPrice: z.number().nonnegative('Unit price cannot be negative'),
+});
+
+const updateInvoiceSchema = z.object({
+  businessName: z.string().min(1, 'Business name is required').optional(),
+  pan: z.string().optional().nullable(),
+  gstin: z.string().optional().nullable(),
+  clientName: z.string().min(1, 'Client name is required').optional(),
+  clientEmail: z.string().email('Valid client email is required').optional(),
+  clientPhone: z.string().optional().nullable(),
+  paymentMode: z.enum(PAYMENT_MODES, { errorMap: () => ({ message: 'Invalid payment mode' }) }).optional(),
+  items: z.array(updateInvoiceItemSchema).min(1, 'At least one item is required').optional(),
+  gstRate: z.number().nonnegative('GST rate cannot be negative').optional(),
+  discount: z.number().nonnegative('Discount cannot be negative').optional(),
+  amountPaid: z.number().nonnegative('Amount paid cannot be negative').optional(),
+  dueDate: z.string().or(z.date()).optional(),
+  status: z.enum(INVOICE_STATUSES, { errorMap: () => ({ message: 'Invalid invoice status' }) }).optional(),
+});
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   const currentUser = await getCurrentUser();
@@ -28,6 +51,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
   try {
     const body = await request.json();
+    const validated = updateInvoiceSchema.parse(body);
+
     const existing = await prisma.invoice.findFirst({
       where: { id: params.id, userId: currentUser.userId },
     });
@@ -36,8 +61,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
     }
 
-    if (body.clientPhone) {
-      const phoneVal = validatePhoneNumber(body.clientPhone);
+    if (validated.clientPhone) {
+      const phoneVal = validatePhoneNumber(validated.clientPhone);
       if (!phoneVal.isValid) {
         return NextResponse.json({ error: phoneVal.error }, { status: 400 });
       }
@@ -48,24 +73,25 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     let gstAmount = existing.gstAmount;
     let total = existing.total;
 
-    if (body.items && Array.isArray(body.items)) {
+    const discount = validated.discount !== undefined ? validated.discount : existing.discount;
+
+    if (validated.items && Array.isArray(validated.items)) {
       subtotal = 0;
-      const itemsWithAmounts = body.items.map((item: any) => {
-        const amt = (item.quantity || 1) * (item.unitPrice || 0);
+      const itemsWithAmounts = validated.items.map((item) => {
+        const amt = item.quantity * item.unitPrice;
         subtotal += amt;
         return { ...item, amount: amt };
       });
       itemsJson = JSON.stringify(itemsWithAmounts);
-      const rate = body.gstRate !== undefined ? body.gstRate : 18;
+      const rate = validated.gstRate !== undefined ? validated.gstRate : 18;
       gstAmount = (subtotal * rate) / 100;
-      const disc = body.discount !== undefined ? body.discount : existing.discount;
-      total = Math.max(0, subtotal + gstAmount - disc);
+      total = Math.max(0, subtotal + gstAmount - discount);
     }
 
-    const newAmountPaid = body.amountPaid !== undefined ? parseFloat(body.amountPaid) : existing.amountPaid;
-    let finalStatus = body.status || existing.status;
+    const newAmountPaid = validated.amountPaid !== undefined ? validated.amountPaid : existing.amountPaid;
+    let finalStatus = validated.status || existing.status;
 
-    if (body.amountPaid !== undefined && !body.status) {
+    if (validated.amountPaid !== undefined && !validated.status) {
       if (newAmountPaid >= total && total > 0) {
         finalStatus = 'Paid';
       } else if (newAmountPaid > 0 && newAmountPaid < total) {
@@ -76,26 +102,29 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     const updated = await prisma.invoice.update({
       where: { id: params.id },
       data: {
-        businessName: body.businessName || existing.businessName,
-        pan: body.pan !== undefined ? body.pan : existing.pan,
-        gstin: body.gstin !== undefined ? body.gstin : existing.gstin,
-        clientName: body.clientName || existing.clientName,
-        clientEmail: body.clientEmail || existing.clientEmail,
-        clientPhone: body.clientPhone !== undefined ? body.clientPhone : existing.clientPhone,
-        paymentMode: body.paymentMode || existing.paymentMode,
+        businessName: validated.businessName || existing.businessName,
+        pan: validated.pan !== undefined ? validated.pan : existing.pan,
+        gstin: validated.gstin !== undefined ? validated.gstin : existing.gstin,
+        clientName: validated.clientName || existing.clientName,
+        clientEmail: validated.clientEmail || existing.clientEmail,
+        clientPhone: validated.clientPhone !== undefined ? validated.clientPhone : existing.clientPhone,
+        paymentMode: validated.paymentMode || existing.paymentMode,
         items: itemsJson,
         subtotal,
         gstAmount,
-        discount: body.discount !== undefined ? body.discount : existing.discount,
+        discount,
         total,
         amountPaid: newAmountPaid,
         status: finalStatus,
-        dueDate: body.dueDate ? new Date(body.dueDate) : existing.dueDate,
+        dueDate: validated.dueDate ? new Date(validated.dueDate) : existing.dueDate,
       },
     });
 
     return NextResponse.json({ invoice: updated });
   } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.errors[0].message }, { status: 400 });
+    }
     return NextResponse.json({ error: error.message || 'Update failed' }, { status: 500 });
   }
 }

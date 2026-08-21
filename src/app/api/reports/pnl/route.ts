@@ -3,6 +3,8 @@ import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { calculatePnLData, getPeriodDateRanges } from '@/lib/pnl-utils';
 
+const ALLOWED_PERIODS = ['this-month', 'prev-month', 'full-year', 'all-time', 'custom'];
+
 export async function GET(request: Request) {
   const currentUser = await getCurrentUser();
   if (!currentUser) {
@@ -13,6 +15,27 @@ export async function GET(request: Request) {
   const period = searchParams.get('period') || 'this-month';
   const from = searchParams.get('from');
   const to = searchParams.get('to');
+
+  if (!ALLOWED_PERIODS.includes(period)) {
+    return NextResponse.json(
+      { error: `Invalid period parameter '${period}'. Allowed values: ${ALLOWED_PERIODS.join(', ')}` },
+      { status: 400 }
+    );
+  }
+
+  if (period === 'custom') {
+    if (!from || !to) {
+      return NextResponse.json({ error: 'Custom period requires both "from" and "to" date parameters' }, { status: 400 });
+    }
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+      return NextResponse.json({ error: 'Invalid custom date range parameters' }, { status: 400 });
+    }
+    if (toDate < fromDate) {
+      return NextResponse.json({ error: 'To Date cannot be before From Date' }, { status: 400 });
+    }
+  }
 
   const { startDate, endDate, prevStartDate, prevEndDate, periodLabel, comparisonLabel } = getPeriodDateRanges(period, new Date(), from, to);
 
